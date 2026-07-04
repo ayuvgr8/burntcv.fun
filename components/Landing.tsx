@@ -36,9 +36,6 @@ export default function Landing({
           </div>
         </div>
         <div style={css("display:flex;align-items:center;gap:18px;")}>
-          <span style={css("font-size:14px;font-weight:600;color:#5a5a5a;cursor:pointer;")}>
-            Sign in
-          </span>
           <button
             onClick={onRoast}
             style={css(

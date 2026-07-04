@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://burntcv.app";
@@ -52,6 +53,8 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        {/* Global footer — carries Terms / Privacy / Refund / Contact on every route. */}
+        <SiteFooter />
         <Analytics />
       </body>
     </html>

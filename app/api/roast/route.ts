@@ -72,9 +72,9 @@ export async function POST(req: Request) {
       // No platform key configured — tell the client to prompt for BYOK.
       return NextResponse.json({ error: "no_server_key" }, { status: 503 });
     }
-    // Anthropic overloaded / rate-limited / timed out: ask the client to retry
-    // rather than serving a canned roast that won't match their résumé.
-    if (/anthropic_(429|529)|aborted|timeout/i.test(msg)) {
+    // Overloaded / rate-limited / timed out / gateway budget hit (402): ask the
+    // client to retry rather than serving a canned roast that won't match theirs.
+    if (/anthropic_(402|429|529)|aborted|timeout/i.test(msg)) {
       console.error("[roast] upstream overloaded:", msg);
       return NextResponse.json({ error: "overloaded" }, { status: 503 });
     }

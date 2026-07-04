@@ -301,8 +301,8 @@ export default function BurntCV() {
     go("paywall");
   }, [resumeText, byok, hasPass, roastsToday, freeRoastUsed, go, toastMsg, doRoast]);
 
-  const runGlowup = useCallback(async () => {
-    // Glow-Up rides on a roast you were already entitled to make — no extra gate.
+  // Runs the actual Glow-Up call (used by the free path and after a ₹5 purchase).
+  const execGlowup = useCallback(async () => {
     setGlowupLoading(true);
     setGlowup(null);
     setMenuOpen(false);
@@ -312,6 +312,16 @@ export default function BurntCV() {
     setGlowup(g);
     setGlowupLoading(false);
   }, [go, resumeText, apiKey]);
+
+  // Pass holders & BYOK get the Glow-Up free; everyone else pays ₹5.
+  const runGlowup = useCallback(() => {
+    if (hasPass || byok) {
+      execGlowup();
+      return;
+    }
+    setPaywallReason("glowup");
+    go("paywall");
+  }, [hasPass, byok, execGlowup, go]);
 
   const buy = useCallback(
     async (plan: Plan) => {
@@ -350,6 +360,8 @@ export default function BurntCV() {
           if (reason === "watermark") {
             setWmOff(true);
             setScreen("card");
+          } else if (reason === "glowup") {
+            execGlowup(); // Pass now includes the Glow-Up — run it
           } else if (reason === "roast" || reason === "daily") {
             setScreen("input");
             doRoast("lifetime");
@@ -357,6 +369,10 @@ export default function BurntCV() {
             goBack();
           }
         }, 80);
+      } else if (plan === "glowup") {
+        // ₹5 Glow-Up — pay then run the fix-list on the current roast.
+        toastMsg(res.simulated ? "Glow-Up unlocked (demo) ✨" : "Glow-Up unlocked ✨");
+        setTimeout(() => execGlowup(), 80);
       } else {
         // ₹7 single — pay then roast this one now (no stored balance).
         toastMsg(res.simulated ? "Roast unlocked (demo) 🔥" : "Roast unlocked 🔥");
@@ -366,7 +382,7 @@ export default function BurntCV() {
         }, 80);
       }
     },
-    [paywallReason, toastMsg, goBack, doRoast],
+    [paywallReason, toastMsg, goBack, doRoast, execGlowup],
   );
 
   const restorePassFromInput = useCallback(async () => {
