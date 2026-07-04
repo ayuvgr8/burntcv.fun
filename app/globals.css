@@ -1,0 +1,70 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: #e9e7ec;
+  font-family: "Satoshi", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #0f0623;
+}
+textarea,
+input,
+button {
+  font-family: inherit;
+}
+textarea:focus,
+input:focus {
+  outline: none;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+::selection {
+  background: #ea4c89;
+  color: #fff;
+}
+@keyframes ember {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.1);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fadeup {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes flick {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
