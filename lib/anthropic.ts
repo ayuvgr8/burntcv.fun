@@ -6,12 +6,25 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 export const ROAST_MODEL = process.env.ROAST_MODEL ?? "claude-sonnet-4-6";
 const REQUEST_TIMEOUT_MS = Number(process.env.ROAST_TIMEOUT_MS ?? 45000);
 
+export interface ClaudeUsage {
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface ClaudeResult {
+  text: string;
+  model: string;
+  usage: ClaudeUsage;
+}
+
 export async function callClaude(
   prompt: string,
   opts: { apiKey: string; model?: string; maxTokens?: number } = { apiKey: "" },
-): Promise<string> {
+): Promise<ClaudeResult> {
   const apiKey = opts.apiKey || process.env.ANTHROPIC_API_KEY || "";
   if (!apiKey) throw new Error("no_api_key");
+
+  const model = opts.model ?? ROAST_MODEL;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -27,7 +40,7 @@ export async function callClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: opts.model ?? ROAST_MODEL,
+        model,
         max_tokens: opts.maxTokens ?? 1024,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -48,8 +61,16 @@ export async function callClaude(
 
   const data = (await res.json()) as {
     content?: { type: string; text?: string }[];
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
   const text = data.content?.find((b) => b.type === "text")?.text ?? "";
   if (!text) throw new Error("empty_response");
-  return text;
+  return {
+    text,
+    model,
+    usage: {
+      input_tokens: data.usage?.input_tokens ?? 0,
+      output_tokens: data.usage?.output_tokens ?? 0,
+    },
+  };
 }
