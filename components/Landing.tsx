@@ -1,6 +1,7 @@
 "use client";
 
 import { css } from "./css";
+import Footer from "./Footer";
 
 export default function Landing({
   onRoast,
@@ -231,6 +232,8 @@ export default function Landing({
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
