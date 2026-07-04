@@ -112,39 +112,58 @@ export default function LegalPage({
   tagline,
   updated,
   children,
+  embed = false,
 }: {
   title: string;
   tagline?: string;
   updated: string;
   children: ReactNode;
+  // `embed` renders the doc for the footer pop-up (inside an iframe): the site
+  // nav bar is dropped and the page background goes transparent so it sits
+  // cleanly inside the modal card.
+  embed?: boolean;
 }) {
   return (
-    <main style={css("min-height:100vh;background:#e9e7ec;color:#0f0623;")}>
-      <div style={css("max-width:780px;margin:0 auto;padding:26px 20px 60px;")}>
-        {/* top bar */}
-        <div
-          style={css(
-            "display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;",
-          )}
-        >
-          <Link
-            href="/"
+    <main
+      style={css(
+        embed
+          ? "background:transparent;color:#0f0623;"
+          : "min-height:100vh;background:#e9e7ec;color:#0f0623;",
+      )}
+    >
+      <div
+        style={css(
+          embed
+            ? "max-width:780px;margin:0 auto;padding:20px 18px 40px;"
+            : "max-width:780px;margin:0 auto;padding:26px 20px 60px;",
+        )}
+      >
+        {/* top bar — hidden in embed/pop-up mode */}
+        {!embed && (
+          <div
             style={css(
-              "display:inline-flex;align-items:center;gap:8px;font-weight:900;font-size:18px;color:#0f0623;",
+              "display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;",
             )}
           >
-            <span aria-hidden style={css("font-size:20px;")}>
-              🔥
-            </span>{" "}
-            BurntCV
-          </Link>
-          <Link
-            href="/"
-            style={css("font-size:13px;font-weight:600;color:#4e3188;")}
-          >
-            ← back to roasting
-          </Link>
-        </div>
+            <Link
+              href="/"
+              style={css(
+                "display:inline-flex;align-items:center;gap:8px;font-weight:900;font-size:18px;color:#0f0623;",
+              )}
+            >
+              <span aria-hidden style={css("font-size:20px;")}>
+                🔥
+              </span>{" "}
+              BurntCV
+            </Link>
+            <Link
+              href="/"
+              style={css("font-size:13px;font-weight:600;color:#4e3188;")}
+            >
+              ← back to roasting
+            </Link>
+          </div>
+        )}
 
         {/* header */}
         <header style={css("margin-bottom:24px;")}>

@@ -8,12 +8,18 @@ export const metadata: Metadata = {
     "Get in touch with BurntCV — support, privacy grievances, and business details.",
 };
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Contact"
       tagline="Real humans (well, one) behind the roasts. Here's how to reach us."
       updated={LEGAL.effectiveDate}
+      embed={embed}
     >
       <Callout>
         Fastest way to reach us is email. We reply to most messages within 2
@@ -34,7 +40,6 @@ export default function ContactPage() {
         <A href="/privacy">Privacy Policy</A>, contact our Grievance Officer:
       </P>
       <Ul>
-        <Li>{LEGAL.grievanceOfficer}</Li>
         <Li><A href={`mailto:${LEGAL.grievanceEmail}`}>{LEGAL.grievanceEmail}</A></Li>
       </Ul>
 

@@ -115,6 +115,7 @@ export async function requestRoast(args: {
 export async function requestGlowup(args: {
   text: string;
   apiKey: string;
+  passToken: string;
 }): Promise<Glowup> {
   const text = (args.text || "").slice(0, INPUT_CHAR_CAP);
   if (args.apiKey) {
@@ -133,7 +134,7 @@ export async function requestGlowup(args: {
     const res = await fetch("/api/glowup", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, passToken: args.passToken }),
     });
     const data = await res.json();
     const g = data?.glowup;

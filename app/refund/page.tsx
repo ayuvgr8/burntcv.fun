@@ -8,12 +8,18 @@ export const metadata: Metadata = {
     "How refunds and cancellations work at BurntCV. Digital product, delivered instantly, one-time purchases — with refunds for genuine failures.",
 };
 
-export default function RefundPage() {
+export default async function RefundPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Refund & Cancellation"
       tagline="Digital product, delivered in seconds. Here's exactly when you get your money back."
       updated={LEGAL.effectiveDate}
+      embed={embed}
     >
       <Callout>
         <strong>The short version:</strong> there&apos;s a free roast so you can try

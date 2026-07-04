@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
+import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
+import { verifyToken } from "@/lib/entitlements";
 import {
   buildGlowupPrompt,
   fallbackGlowup,
@@ -12,7 +14,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let body: { text?: string };
+  let body: { text?: string; passToken?: string };
   try {
     body = await req.json();
   } catch {
@@ -22,6 +24,16 @@ export async function POST(req: Request) {
   const text = (body.text ?? "").slice(0, INPUT_CHAR_CAP);
   if (text.trim().length < 40) {
     return NextResponse.json({ error: "too_short" }, { status: 400 });
+  }
+
+  // A valid Pass token bypasses the limit (Glow-Up is included with the Pass);
+  // everyone else is IP-limited so the ₹7 gate can't be bypassed by calling the
+  // route directly. (BYOK never reaches here — it runs direct from the browser.)
+  if (!verifyToken(body.passToken)) {
+    const { allowed } = await checkAndIncrement(ipFrom(req));
+    if (!allowed) {
+      return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+    }
   }
 
   const prompt = buildGlowupPrompt() + "\n\nINPUT:\n" + text;

@@ -85,7 +85,7 @@ export default function BurntCV() {
   const [restoreInput, setRestoreInput] = useState("");
   const [restoring, setRestoring] = useState(false);
   const [paywallReason, setPaywallReason] = useState<
-    "roast" | "daily" | "watermark" | "upsell" | null
+    "roast" | "daily" | "watermark" | "glowup" | "unhinged" | "upsell" | null
   >(null);
 
   const stack = useRef<Screen[]>([]);
@@ -295,25 +295,32 @@ export default function BurntCV() {
       go("paywall");
       return;
     }
+    // Unhinged 💀 is a paid tier — ₹7 from the first roast. Only Mild and
+    // Medium Rare are free on the house.
+    if (!intensityById(intensity).free) {
+      setPaywallReason("unhinged");
+      go("paywall");
+      return;
+    }
     if (!freeRoastUsed) return void doRoast("free");
     // Free roast spent, no pass → pay to keep roasting.
     setPaywallReason("roast");
     go("paywall");
-  }, [resumeText, byok, hasPass, roastsToday, freeRoastUsed, go, toastMsg, doRoast]);
+  }, [resumeText, byok, hasPass, roastsToday, freeRoastUsed, intensity, go, toastMsg, doRoast]);
 
-  // Runs the actual Glow-Up call (used by the free path and after a ₹5 purchase).
+  // Runs the actual Glow-Up call (used by the free path and after a ₹7 purchase).
   const execGlowup = useCallback(async () => {
     setGlowupLoading(true);
     setGlowup(null);
     setMenuOpen(false);
     ev("glowup_run");
     go("glowup");
-    const g = await requestGlowup({ text: resumeText, apiKey });
+    const g = await requestGlowup({ text: resumeText, apiKey, passToken });
     setGlowup(g);
     setGlowupLoading(false);
-  }, [go, resumeText, apiKey]);
+  }, [go, resumeText, apiKey, passToken]);
 
-  // Pass holders & BYOK get the Glow-Up free; everyone else pays ₹5.
+  // Pass holders & BYOK get the Glow-Up free; everyone else pays ₹7.
   const runGlowup = useCallback(() => {
     if (hasPass || byok) {
       execGlowup();
@@ -362,7 +369,7 @@ export default function BurntCV() {
             setScreen("card");
           } else if (reason === "glowup") {
             execGlowup(); // Pass now includes the Glow-Up — run it
-          } else if (reason === "roast" || reason === "daily") {
+          } else if (reason === "roast" || reason === "daily" || reason === "unhinged") {
             setScreen("input");
             doRoast("lifetime");
           } else {
@@ -370,7 +377,7 @@ export default function BurntCV() {
           }
         }, 80);
       } else if (plan === "glowup") {
-        // ₹5 Glow-Up — pay then run the fix-list on the current roast.
+        // ₹7 Glow-Up — pay then run the fix-list on the current roast.
         toastMsg(res.simulated ? "Glow-Up unlocked (demo) ✨" : "Glow-Up unlocked ✨");
         setTimeout(() => execGlowup(), 80);
       } else {
@@ -556,33 +563,47 @@ export default function BurntCV() {
   const canRemoveWatermark = hasPass || byok;
   const showWatermark = !(canRemoveWatermark && wmOff);
 
+  const isGlowup = paywallReason === "glowup";
+  const isUnhinged = paywallReason === "unhinged";
   const paywallEmoji =
     paywallReason === "daily"
       ? "🔥"
       : paywallReason === "watermark"
         ? "💧"
-        : "⚡";
+        : isGlowup
+          ? "✨"
+          : isUnhinged
+            ? "💀"
+            : "⚡";
   const paywallTitle =
     paywallReason === "daily"
       ? "That's your 5 for today."
       : paywallReason === "watermark"
         ? "Watermark-free is a Pass perk."
-        : paywallReason === "roast"
-          ? "Loved your free roast?"
-          : "Roast without limits.";
+        : isGlowup
+          ? "Now let's fix it. ✨"
+          : isUnhinged
+            ? "Unhinged is no-mercy mode. 💀"
+            : paywallReason === "roast"
+              ? "Loved your free roast?"
+              : "Roast without limits.";
   const paywallSub =
     paywallReason === "daily"
       ? "Your Pass gives you 5 a day and you’ve used them. Grab a ₹5 top-up, or come back tomorrow."
       : paywallReason === "watermark"
         ? "Get the 6-Month Pass to drop the watermark on every card you share."
-        : paywallReason === "roast"
-          ? "Your first one was on us. Keep roasting — ₹7 a pop, or ₹199 for 5 a day, 6 months."
-          : "₹7 per roast, or ₹199 for 5 roasts a day for 6 months.";
+        : isGlowup
+          ? "The roast found the flaws — the Glow-Up rewrites them into callback bullets. ₹7, or free on the 6-Month Pass."
+          : isUnhinged
+            ? "The savage tier is ₹7 a roast — or free on the 6-Month Pass. (Mild & Medium Rare stay free for your first roast.)"
+            : paywallReason === "roast"
+              ? "Your first one was on us. Keep roasting — ₹7 a pop, or ₹199 for 5 a day, 6 months."
+              : "₹7 per roast, or ₹199 for 5 roasts a day for 6 months.";
   const showSingle = paywallReason !== "watermark";
   const showLifetime = paywallReason !== "daily";
-  // Pass holders past today's 5 pay a discounted ₹5 top-up; everyone else ₹7.
+  // Pass holders past 5/day pay a ₹5 top-up; Glow-Up and a single roast are ₹7.
   const isDaily = paywallReason === "daily";
-  const payPlan: Plan = isDaily ? "topup" : "single";
+  const payPlan: Plan = isGlowup ? "glowup" : isDaily ? "topup" : "single";
   const payRupees = isDaily ? 5 : 7;
 
   const tabBtn = (active: boolean) =>
@@ -822,6 +843,15 @@ export default function BurntCV() {
                           <div style={css("font-size:10.5px;color:#808080;line-height:1.35;")}>
                             {t.desc}
                           </div>
+                          {!t.free && !hasPass && !byok && (
+                            <span
+                              style={css(
+                                "position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;letter-spacing:.02em;color:#ed3237;background:rgba(237,50,55,.1);padding:2px 6px;border-radius:6px;",
+                              )}
+                            >
+                              ₹7
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -1188,7 +1218,7 @@ export default function BurntCV() {
                       "flex:1;border:1.5px solid #4e3188;background:#fff;color:#4e3188;cursor:pointer;padding:13px;border-radius:13px;font-weight:800;font-size:14px;",
                     )}
                   >
-                    ✨ The Glow-Up
+                    ✨ The Glow-Up{hasPass || byok ? "" : " · ₹7"}
                   </button>
                   <button
                     onClick={() => go("input")}
@@ -1619,13 +1649,15 @@ export default function BurntCV() {
                         ₹{payRupees}
                       </span>
                       <span style={css("font-size:13px;color:#808080;font-weight:600;")}>
-                        {isDaily ? "extra roast" : "one roast"}
+                        {isGlowup ? "the Glow-Up" : isDaily ? "extra roast" : "one roast"}
                       </span>
                     </div>
                     <div style={css("font-size:12.5px;color:#5a5a5a;line-height:1.4;margin-top:3px;")}>
-                      {isDaily
-                        ? "One more today — your 5 reset tomorrow."
-                        : "Pay as you go — this roast, right now."}
+                      {isGlowup
+                        ? "Your résumé, actually fixed — the callback edit."
+                        : isDaily
+                          ? "One more today — your 5 reset tomorrow."
+                          : "Pay as you go — this roast, right now."}
                     </div>
                   </div>
                   <button

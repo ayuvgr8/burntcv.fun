@@ -131,8 +131,8 @@ export const INTENSITIES: Intensity[] = [
   {
     id: "medium",
     emoji: "🔥",
-    label: "Medium",
-    desc: "Properly sarcastic.",
+    label: "Medium Rare",
+    desc: "Sarcastic, with bite.",
     free: true,
     note: "Properly sarcastic — land real punches, still affectionate.",
   },
@@ -141,7 +141,7 @@ export const INTENSITIES: Intensity[] = [
     emoji: "💀",
     label: "Unhinged",
     desc: "No mercy. Max satire.",
-    free: true,
+    free: false, // always ₹7 (even the first roast) unless Pass / BYOK
     note: "Maximum savagery aimed at the WRITING — no mercy on the clichés and choices. Never attacks the person.",
   },
 ];

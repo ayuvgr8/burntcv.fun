@@ -26,9 +26,6 @@ export const LEGAL = {
   supportEmail: "quvonlabs@gmail.com",
   grievanceEmail: "quvonlabs@gmail.com",
 
-  // Named Grievance Officer (solo founder is fine).
-  grievanceOfficer: "Ayush Verma",
-
   // Only if GST-registered; leave "" otherwise.
   gstin: "",
 

@@ -13,7 +13,7 @@ export type Plan = "single" | "topup" | "glowup" | "lifetime";
 export const PRICES: Record<Plan, { rupees: number; label: string }> = {
   single: { rupees: 7, label: "One roast" }, // free user, past their freebie
   topup: { rupees: 5, label: "Extra roast" }, // lifetime user, past today's 5
-  glowup: { rupees: 5, label: "The Glow-Up fix-list" }, // free/single user
+  glowup: { rupees: 7, label: "The Glow-Up fix-list" }, // free/single user
   lifetime: { rupees: 199, label: "6-Month Pass · 5/day" },
 };
 

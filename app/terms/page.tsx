@@ -8,12 +8,18 @@ export const metadata: Metadata = {
     "The terms for using BurntCV — an AI résumé-roasting entertainment product. Please read before you get destroyed.",
 };
 
-export default function TermsPage() {
+export default async function TermsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Terms of Service"
       tagline="The boring bit before the roast. Read it once so we both know where we stand."
       updated={LEGAL.effectiveDate}
+      embed={embed}
     >
       <Callout>
         <strong>The short version:</strong> BurntCV is a comedy product that

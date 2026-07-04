@@ -8,12 +8,18 @@ export const metadata: Metadata = {
     "How BurntCV handles your data. Short answer: we don't store your résumé — it's processed to make your roast and then it's gone.",
 };
 
-export default function PrivacyPage() {
+export default async function PrivacyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Privacy Policy"
       tagline="Roasted and forgotten. Here's exactly what that means."
       updated={LEGAL.effectiveDate}
+      embed={embed}
     >
       <Callout tone="purple">
         <strong>The short version:</strong> we don&apos;t store your résumé. Your file
@@ -141,7 +147,6 @@ export default function PrivacyPage() {
         Officer:
       </P>
       <Ul>
-        <Li>{LEGAL.grievanceOfficer}</Li>
         <Li><A href={`mailto:${LEGAL.grievanceEmail}`}>{LEGAL.grievanceEmail}</A></Li>
       </Ul>
       <P>

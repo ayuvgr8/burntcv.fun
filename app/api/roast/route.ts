@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
 import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
 import { verifyToken } from "@/lib/entitlements";
+import { getRedis } from "@/lib/redis";
 import {
   buildRoastPrompt,
   fallbackRoast,
@@ -88,6 +89,12 @@ export async function POST(req: Request) {
   if (!Array.isArray(roast.bento)) roast.bento = [];
   if (!roast.score || typeof roast.score.value !== "number")
     roast.score = fallbackRoast().score;
+
+  // Bump the global "résumés roasted" counter. Fire-and-forget and atomic —
+  // it must never block or break the roast if Redis is down or absent.
+  getRedis()
+    ?.incr("roast:count")
+    .catch(() => {});
 
   return NextResponse.json({ roast });
 }
