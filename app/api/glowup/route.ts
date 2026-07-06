@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
 import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
+import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import { verifyToken } from "@/lib/entitlements";
 import {
   buildGlowupPrompt,
@@ -34,14 +35,19 @@ export async function POST(req: Request) {
     if (!allowed) {
       return NextResponse.json({ error: "rate_limited" }, { status: 429 });
     }
+    // Glowup runs on the platform key too — respect the same daily spend cap.
+    if (!(await budgetAvailable())) {
+      return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
+    }
   }
 
   const prompt = buildGlowupPrompt() + "\n\nINPUT:\n" + text;
 
   let glowup: Glowup | null = null;
   try {
-    const raw = await callClaude(prompt, { apiKey: "" });
-    glowup = parseRoastJSON<Glowup>(raw);
+    const res = await callClaude(prompt, { apiKey: "" });
+    await recordSpend(res.model, res.usage);
+    glowup = parseRoastJSON<Glowup>(res.text);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
     if (msg === "no_api_key") {

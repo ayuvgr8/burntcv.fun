@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
 import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
+import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import { verifyToken } from "@/lib/entitlements";
 import { getRedis } from "@/lib/redis";
 import {
@@ -44,6 +45,11 @@ export async function POST(req: Request) {
     if (!allowed) {
       return NextResponse.json({ error: "rate_limited" }, { status: 429 });
     }
+    // Global platform-key spend cap: when today's Anthropic budget is spent,
+    // stop serving on the platform key and steer to BYOK (same UX as no key).
+    if (!(await budgetAvailable())) {
+      return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
+    }
   }
 
   const prompt =
@@ -57,15 +63,17 @@ export async function POST(req: Request) {
 
   let roast: Roast | null = null;
   try {
-    let raw = await callClaude(prompt, { apiKey: "" });
-    roast = parseRoastJSON<Roast>(raw);
+    let res = await callClaude(prompt, { apiKey: "" });
+    await recordSpend(res.model, res.usage);
+    roast = parseRoastJSON<Roast>(res.text);
     if (!isValidRoast(roast)) {
       // Retry once with a firmer instruction (defensive parse per PRD §7.3).
-      raw = await callClaude(
+      res = await callClaude(
         prompt + "\n\nReturn ONLY the JSON object. No other text.",
         { apiKey: "" },
       );
-      roast = parseRoastJSON<Roast>(raw);
+      await recordSpend(res.model, res.usage);
+      roast = parseRoastJSON<Roast>(res.text);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";

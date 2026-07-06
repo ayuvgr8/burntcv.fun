@@ -1,62 +1,69 @@
 import type { Metadata } from "next";
-import { LEGAL } from "@/lib/legal";
-import LegalPage, { Callout, H2, P, Ul, Li, A } from "@/components/LegalPage";
+import LegalPage, { Section } from "@/components/LegalPage";
+import { OPERATOR, OPERATOR_LOCATION } from "@/lib/operator";
 
 export const metadata: Metadata = {
-  title: "Contact · BurntCV",
-  description:
-    "Get in touch with BurntCV — support, privacy grievances, and business details.",
+  title: "Contact Us — BurntCV",
+  description: `Get in touch with ${OPERATOR.legalName}, the team behind ${OPERATOR.brand}.`,
+  robots: { index: true, follow: true },
 };
 
-export default async function ContactPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ embed?: string }>;
-}) {
-  const embed = (await searchParams).embed === "1";
+export default function ContactPage() {
   return (
     <LegalPage
-      title="Contact"
-      tagline="Real humans (well, one) behind the roasts. Here's how to reach us."
-      updated={LEGAL.effectiveDate}
-      embed={embed}
+      title="Contact Us"
+      intro={
+        <>
+          Questions, payment issues, or feedback on your roast? {OPERATOR.legalName}
+          {" "}runs {OPERATOR.brand} and we&apos;re happy to help.
+        </>
+      }
     >
-      <Callout>
-        Fastest way to reach us is email. We reply to most messages within 2
-        business days.
-      </Callout>
+      <Section title="Email">
+        <p>
+          <a
+            href={`mailto:${OPERATOR.email}`}
+            style={{ color: "#4e3188", fontWeight: 700, fontSize: "18px" }}
+          >
+            {OPERATOR.email}
+          </a>
+        </p>
+        <p>
+          We aim to respond within 2 business days. For refund or payment
+          questions, include your order/payment reference so we can find your
+          transaction quickly.
+        </p>
+      </Section>
 
-      <H2>Support</H2>
-      <P>
-        Questions, bugs, payment issues, or feedback on your roast:
-      </P>
-      <Ul>
-        <Li><A href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</A></Li>
-      </Ul>
+      <Section title="Business operator">
+        <p>
+          {OPERATOR.legalName}
+          <br />
+          {OPERATOR_LOCATION}
+        </p>
+      </Section>
 
-      <H2>Privacy &amp; grievances</H2>
-      <P>
-        For data-protection requests or complaints under our{" "}
-        <A href="/privacy">Privacy Policy</A>, contact our Grievance Officer:
-      </P>
-      <Ul>
-        <Li><A href={`mailto:${LEGAL.grievanceEmail}`}>{LEGAL.grievanceEmail}</A></Li>
-      </Ul>
-
-      <H2>Business details</H2>
-      <Ul>
-        <Li><strong>Operated by:</strong> {LEGAL.entityName} ({LEGAL.entityType})</Li>
-        <Li><strong>Registered address:</strong> {LEGAL.address}</Li>
-        {LEGAL.gstin ? <Li><strong>GSTIN:</strong> {LEGAL.gstin}</Li> : null}
-      </Ul>
-
-      <H2>Hours</H2>
-      <P>Monday–Friday, 10:00–18:00 IST (excluding public holidays).</P>
-
-      <P>
-        See also our <A href="/terms">Terms of Service</A> and{" "}
-        <A href="/refund">Refund &amp; Cancellation Policy</A>.
-      </P>
+      <Section title="Policies">
+        <p>
+          See our{" "}
+          <a href="/terms" style={{ color: "#4e3188", fontWeight: 600 }}>
+            Terms
+          </a>
+          ,{" "}
+          <a href="/privacy" style={{ color: "#4e3188", fontWeight: 600 }}>
+            Privacy Policy
+          </a>
+          ,{" "}
+          <a href="/refund" style={{ color: "#4e3188", fontWeight: 600 }}>
+            Cancellation & Refund Policy
+          </a>
+          , and{" "}
+          <a href="/shipping" style={{ color: "#4e3188", fontWeight: 600 }}>
+            Shipping & Delivery Policy
+          </a>
+          .
+        </p>
+      </Section>
     </LegalPage>
   );
 }
