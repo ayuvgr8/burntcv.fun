@@ -21,7 +21,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     page("/terms", 0.3, "yearly"),
     page("/privacy", 0.3, "yearly"),
     page("/refund", 0.3, "yearly"),
-    page("/shipping", 0.3, "yearly"),
     page("/contact", 0.4, "yearly"),
   ];
 }

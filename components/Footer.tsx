@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { css } from "./css";
-import { OPERATOR, OPERATOR_LOCATION } from "@/lib/operator";
+import { OPERATOR } from "@/lib/operator";
 
 const LINKS: { href: string; label: string }[] = [
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
   { href: "/refund", label: "Refunds" },
-  { href: "/shipping", label: "Delivery" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -82,8 +81,7 @@ export default function Footer() {
             </div>
             <div style={css("font-size:12.5px;line-height:1.55;color:#9c9c9c;")}>
               {OPERATOR.brand} is operated by{" "}
-              <span style={css("color:#5a5a5a;font-weight:600;")}>{OPERATOR.legalName}</span>
-              , {OPERATOR_LOCATION}.
+              <span style={css("color:#5a5a5a;font-weight:600;")}>{OPERATOR.legalName}</span>.
             </div>
             <a
               href={`mailto:${OPERATOR.email}`}

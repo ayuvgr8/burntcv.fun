@@ -59,13 +59,9 @@ export default async function ContactPage({
           <a href="/privacy" style={{ color: "#4e3188", fontWeight: 600 }}>
             Privacy Policy
           </a>
-          ,{" "}
+          , and{" "}
           <a href="/refund" style={{ color: "#4e3188", fontWeight: 600 }}>
             Cancellation & Refund Policy
-          </a>
-          , and{" "}
-          <a href="/shipping" style={{ color: "#4e3188", fontWeight: 600 }}>
-            Shipping & Delivery Policy
           </a>
           .
         </p>

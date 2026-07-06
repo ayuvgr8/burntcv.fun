@@ -4,9 +4,9 @@ import { css } from "./css";
 import Footer from "./Footer";
 import { OPERATOR, POLICY_UPDATED } from "@/lib/operator";
 
-// Shared shell for the policy pages (Terms, Privacy, Refund, Shipping,
-// Contact). Keeps the header, prose rhythm, and footer identical across all of
-// them so the whole legal surface reads as one document set.
+// Shared shell for the policy pages (Terms, Privacy, Refund, Contact). Keeps
+// the header, prose rhythm, and footer identical across all of them so the
+// whole legal surface reads as one document set.
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
