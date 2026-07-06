@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyCreemWebhook, extractEmail } from "@/lib/creem";
+import { verifyCreemWebhook, extractEmail, kindOf } from "@/lib/creem";
 import { ensurePassForOrder } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
@@ -34,7 +34,10 @@ export async function POST(req: Request) {
     if (kind === "checkout.completed") {
       const obj = (event.object || event.data || {}) as Record<string, unknown>;
       const checkoutId = String(obj.id || obj.checkout_id || "");
-      if (checkoutId) {
+      // Only the Pass grants a durable entitlement. Glow-Up purchases are one-off
+      // and consumed client-side, so we never mint anything for them here. Derive
+      // the product server-side; ignore anything that isn't positively the Pass.
+      if (checkoutId && kindOf(obj) === "pass") {
         await ensurePassForOrder({
           orderId: `creem:${checkoutId}`,
           email: extractEmail(obj),

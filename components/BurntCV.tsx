@@ -134,13 +134,20 @@ export default function BurntCV() {
       window.history.replaceState(null, "", "/");
     }
 
-    // Return from a Creem checkout → confirm payment server-side + apply the Pass.
+    // Return from a Creem checkout → confirm payment server-side, then act on
+    // the server-verified product: "glowup" runs the one-off Glow-Up, "pass"
+    // applies the 6-Month Pass entitlement.
     if (params.get("creem") === "success") {
       const cid = params.get("checkout_id");
       window.history.replaceState(null, "", "/");
       if (cid) {
-        claimCreem(cid).then((pass) => {
-          if (pass) {
+        claimCreem(cid).then((res) => {
+          if (res.ok && res.kind === "glowup") {
+            execGlowup();
+            return;
+          }
+          const pass = res.pass;
+          if (res.ok && pass) {
             const gl = pass.glowupsLeft ?? GLOWUPS_PER_PASS;
             setPassUntil(pass.passUntil);
             setPassToken(pass.token);
@@ -460,14 +467,23 @@ export default function BurntCV() {
     [paywallReason, toastMsg, goBack, doRoast, execGlowup],
   );
 
-  // International Pass → redirect to Creem's hosted checkout. On return the mount
-  // effect claims the Pass. If Creem isn't reachable, tell the user.
-  const [creemLoading, setCreemLoading] = useState(false);
+  // International purchases → redirect to Creem's hosted checkout. On return the
+  // mount effect confirms payment and mints the Pass / runs the Glow-Up. If Creem
+  // isn't reachable, tell the user. `creemLoading` tracks whichever is opening.
+  const [creemLoading, setCreemLoading] = useState<null | "pass" | "glowup">(null);
   const buyCreem = useCallback(async () => {
-    setCreemLoading(true);
-    const ok = await startCreemCheckout();
+    setCreemLoading("pass");
+    const ok = await startCreemCheckout("pass");
     if (!ok) {
-      setCreemLoading(false);
+      setCreemLoading(null);
+      toastMsg("Couldn’t open checkout — try again in a moment.");
+    }
+  }, [toastMsg]);
+  const buyCreemGlowup = useCallback(async () => {
+    setCreemLoading("glowup");
+    const ok = await startCreemCheckout("glowup");
+    if (!ok) {
+      setCreemLoading(null);
       toastMsg("Couldn’t open checkout — try again in a moment.");
     }
   }, [toastMsg]);
@@ -699,14 +715,17 @@ export default function BurntCV() {
               : isIN
                 ? "₹7 per roast, or ₹199 for 5 roasts a day for 6 months."
                 : "The 6-Month Pass — 5 roasts a day for 6 months.";
-  // India (Razorpay) shows the micro-roast + ₹199 Pass cards; the rest of the
-  // world (Creem) sees only the $7.20 Pass — micro-payments don't survive
-  // international fees.
+  // India (Razorpay) shows the micro-roast + ₹199 Pass cards. The rest of the
+  // world (Creem) buys the $9.99 Pass — plus, on a Glow-Up prompt, a standalone
+  // $4.99 Glow-Up. No international per-roast micro-charge (fees eat sub-$1).
   const showSingle = isIN && paywallReason !== "watermark";
   // Don't re-upsell the Pass to someone who already holds one (e.g. a Pass
   // holder who's used their 4 Glow-Ups and is now buying a ₹49 top-up).
   const showLifetime = isIN && paywallReason !== "daily" && !hasPass;
   const showCreem = !isIN && paywallReason !== "daily" && !hasPass;
+  // The standalone international Glow-Up ($4.99) — only on a Glow-Up prompt, and
+  // not for Pass holders (their Pass already includes Glow-Ups).
+  const showCreemGlowup = !isIN && isGlowup && !hasPass;
   // Pass holders past 5/day pay a ₹5 top-up; the Glow-Up is ₹49; a single roast ₹7.
   const isDaily = paywallReason === "daily";
   const payPlan: Plan = isGlowup ? "glowup" : isDaily ? "topup" : "single";
@@ -1828,6 +1847,35 @@ export default function BurntCV() {
                 </div>
               )}
 
+              {showCreemGlowup && (
+                <div
+                  style={css(
+                    "border:1.5px solid rgba(15,6,35,.14);border-radius:18px;padding:17px 18px;display:flex;align-items:center;gap:14px;",
+                  )}
+                >
+                  <div style={css("flex:1;")}>
+                    <div style={css("display:flex;align-items:baseline;gap:7px;")}>
+                      <span style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;")}>
+                        $4.99
+                      </span>
+                      <span style={css("font-size:13px;color:#808080;font-weight:600;")}>the Glow-Up</span>
+                    </div>
+                    <div style={css("font-size:12.5px;color:#5a5a5a;line-height:1.4;margin-top:3px;")}>
+                      Your résumé, actually fixed — the callback edit.
+                    </div>
+                  </div>
+                  <button
+                    onClick={buyCreemGlowup}
+                    disabled={!!creemLoading}
+                    style={css(
+                      "flex:none;border:none;cursor:pointer;padding:13px 18px;border-radius:13px;background:#0f0623;color:#fff;font-weight:800;font-size:15px;",
+                    )}
+                  >
+                    {creemLoading === "glowup" ? "…" : "$4.99"}
+                  </button>
+                </div>
+              )}
+
               {showCreem && (
                 <div
                   style={css(
@@ -1842,7 +1890,7 @@ export default function BurntCV() {
                     BEST VALUE · 6 MONTHS
                   </div>
                   <div style={css("display:flex;align-items:baseline;gap:8px;margin-top:6px;")}>
-                    <span style={css("font-size:34px;font-weight:900;letter-spacing:-.02em;")}>$7.20</span>
+                    <span style={css("font-size:34px;font-weight:900;letter-spacing:-.02em;")}>$9.99</span>
                     <span style={css("font-size:14px;color:#808080;font-weight:600;")}>5 a day · 6 months.</span>
                   </div>
                   <div style={css("font-weight:800;font-size:15px;margin:4px 0 14px;")}>BurntCV 6-Month Pass 🔥</div>
@@ -1861,12 +1909,12 @@ export default function BurntCV() {
                   </div>
                   <button
                     onClick={buyCreem}
-                    disabled={creemLoading}
+                    disabled={!!creemLoading}
                     style={css(
                       "width:100%;border:none;cursor:pointer;padding:16px;border-radius:14px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:16px;margin-top:18px;box-shadow:0 14px 26px -12px rgba(237,50,55,.6);",
                     )}
                   >
-                    {creemLoading ? "Opening checkout…" : "Get the Pass — $7.20"}
+                    {creemLoading === "pass" ? "Opening checkout…" : "Get the Pass — $9.99"}
                   </button>
                   <div style={css("text-align:center;font-size:11px;color:#9c9c9c;margin-top:9px;")}>
                     Secure global checkout by Creem · cards &amp; more

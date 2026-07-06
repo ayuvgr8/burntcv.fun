@@ -3,7 +3,7 @@
 // Payment layer. Razorpay-ready, with a clean simulated fallback so the whole
 // pay-to-roast flow works today and goes live the moment you add keys.
 //
-// To go LIVE with real ₹7 / ₹199 charges, set:
+// To go LIVE with real ₹7 / ₹49 / ₹199 charges, set:
 //   NEXT_PUBLIC_RAZORPAY_KEY_ID   (client — enables the real checkout)
 //   RAZORPAY_KEY_SECRET           (server — signs & verifies orders)
 // Without NEXT_PUBLIC_RAZORPAY_KEY_ID the app simulates a successful purchase.
@@ -161,11 +161,18 @@ export async function fetchRegion(): Promise<"IN" | "INTL"> {
   }
 }
 
-// Start the Creem hosted checkout for the international Pass → redirects the
-// browser to Creem. On success Creem returns to /?creem=success&checkout_id=…
-export async function startCreemCheckout(): Promise<boolean> {
+export type CreemKind = "pass" | "glowup";
+
+// Start a Creem hosted checkout → redirects the browser to Creem. `kind` picks
+// the product: the $9.99 Pass or the $4.99 one-off Glow-Up. On success Creem
+// returns to /?creem=success&kind=…&checkout_id=…
+export async function startCreemCheckout(kind: CreemKind = "pass"): Promise<boolean> {
   try {
-    const res = await fetch("/api/creem/checkout", { method: "POST" });
+    const res = await fetch("/api/creem/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind }),
+    });
     const data = await res.json();
     if (data?.url) {
       window.location.href = data.url;
@@ -177,18 +184,30 @@ export async function startCreemCheckout(): Promise<boolean> {
   }
 }
 
-// On return from Creem, confirm payment server-side and get the minted Pass.
-export async function claimCreem(checkoutId: string): Promise<PassEntitlement | null> {
+export interface CreemClaim {
+  ok: boolean;
+  kind?: CreemKind; // server-verified product that was actually paid for
+  pass?: PassEntitlement | null; // present only for a Pass purchase
+}
+
+// On return from Creem, confirm payment server-side. The server re-verifies the
+// product, so the returned `kind` is authoritative: "pass" comes with a minted
+// entitlement; "glowup" means the client should run the one-off Glow-Up.
+export async function claimCreem(checkoutId: string): Promise<CreemClaim> {
   try {
     const res = await fetch("/api/creem/claim", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ checkoutId }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false };
     const data = await res.json();
-    return (data.pass as PassEntitlement) ?? null;
+    return {
+      ok: !!data.ok,
+      kind: data.kind as CreemKind | undefined,
+      pass: (data.pass as PassEntitlement) ?? null,
+    };
   } catch {
-    return null;
+    return { ok: false };
   }
 }
