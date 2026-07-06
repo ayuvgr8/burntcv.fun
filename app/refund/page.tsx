@@ -81,9 +81,10 @@ export default async function RefundPage({
 
       <Section title="How refunds are processed">
         <p>
-          Approved refunds are made to the original payment method through
-          Razorpay. Once processed, it typically takes 5–7 business days for the
-          amount to reflect in your account, depending on your bank or card
+          Approved refunds are made to the original payment method through the
+          processor used at checkout — Razorpay for orders in India, or Creem for
+          international orders. Once processed, it typically takes 5–7 business days
+          for the amount to reflect in your account, depending on your bank or card
           issuer.
         </p>
       </Section>

@@ -15,12 +15,13 @@ export interface HistoryItem {
 }
 
 export { PASS_DAYS, PASS_MS } from "./plan";
-import { PASS_MS } from "./plan";
+import { PASS_MS, GLOWUPS_PER_PASS } from "./plan";
 
 export interface Stored {
   passUntil: number; // epoch ms; pass is active while now < passUntil (0 = none)
   passToken: string; // server-signed Pass token (bypasses the roast rate limit)
   passCode: string; // restore code shown to the user for other devices
+  glowupsLeft: number; // Glow-Up rewrites remaining on the current Pass
   freeRoastUsed: boolean; // the one free roast has been spent
   apiKey: string; // BYOK — unlimited
   usageDate: string;
@@ -39,6 +40,7 @@ export function load(): Stored {
     passUntil: 0,
     passToken: "",
     passCode: "",
+    glowupsLeft: 0,
     freeRoastUsed: false,
     apiKey: "",
     usageDate: today(),
@@ -57,6 +59,13 @@ export function load(): Stored {
       passUntil,
       passToken: u.passToken || "",
       passCode: u.passCode || "",
+      // Existing Pass holders (bought before Glow-Up credits shipped) have no
+      // stored count → assume a full quota; the server reconciles the truth.
+      glowupsLeft: Number.isFinite(u.glowupsLeft)
+        ? u.glowupsLeft
+        : passUntil > Date.now()
+          ? GLOWUPS_PER_PASS
+          : 0,
       freeRoastUsed: !!u.freeRoastUsed,
       apiKey: u.apiKey || "",
       usageDate: today(),

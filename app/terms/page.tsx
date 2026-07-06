@@ -70,11 +70,13 @@ export default async function TermsPage({
 
       <Section title="5. Payments">
         <p>
-          Paid roasts and passes are billed in Indian Rupees through our payment
-          processor, Razorpay. {OPERATOR.legalName} is the merchant of record.
-          Prices shown at checkout are inclusive of applicable taxes unless stated
-          otherwise. Cancellations and refunds are governed by our Cancellation &
-          Refund Policy.
+          Customers in India are billed in Indian Rupees through our payment
+          processor, Razorpay, with {OPERATOR.legalName} as the merchant of record.
+          Customers outside India are billed in US Dollars through Creem, which
+          acts as the merchant of record for those orders and handles applicable
+          international sales tax/VAT. Prices shown at checkout are inclusive of
+          applicable taxes unless stated otherwise. Cancellations and refunds are
+          governed by our Cancellation & Refund Policy.
         </p>
       </Section>
 

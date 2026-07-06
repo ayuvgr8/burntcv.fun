@@ -48,10 +48,10 @@ export default async function PrivacyPage({
         </p>
         <p>
           <strong>Payment information.</strong> When you pay, checkout is handled
-          by Razorpay. Your card and payment details are entered on
-          Razorpay&apos;s systems — we never see or store your full card number.
-          We receive only a payment confirmation and, for passes, an email you
-          provide so we can restore your entitlement.
+          by Razorpay (in India) or Creem (internationally). Your card and payment
+          details are entered on their systems — we never see or store your full
+          card number. We receive only a payment confirmation and, for passes, an
+          email you provide so we can restore your entitlement.
         </p>
         <p>
           <strong>Technical data.</strong> To prevent abuse and apply free-tier
@@ -70,9 +70,9 @@ export default async function PrivacyPage({
       <Section title="Who we share with">
         <p>
           We share data only with the service providers needed to run {OPERATOR.brand}:
-          our AI model provider (to generate the roast), Razorpay (to process
-          payments), and our hosting and analytics providers. We do not sell your
-          personal information.
+          our AI model provider (to generate the roast), our payment processors
+          Razorpay and Creem (to process payments), and our hosting and analytics
+          providers. We do not sell your personal information.
         </p>
       </Section>
 

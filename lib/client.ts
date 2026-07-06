@@ -112,11 +112,18 @@ export async function requestRoast(args: {
   }
 }
 
+export interface GlowupResult {
+  glowup: Glowup;
+  glowupsLeft?: number; // Pass Glow-Ups remaining after this one (Pass path only)
+  exhausted?: boolean; // Pass had no Glow-Ups left → caller should charge ₹49
+}
+
 export async function requestGlowup(args: {
   text: string;
   apiKey: string;
   passToken: string;
-}): Promise<Glowup> {
+  paid?: boolean; // a ₹49 top-up the user just paid for → don't spend a Pass credit
+}): Promise<GlowupResult> {
   const text = (args.text || "").slice(0, INPUT_CHAR_CAP);
   if (args.apiKey) {
     try {
@@ -125,22 +132,30 @@ export async function requestGlowup(args: {
         args.apiKey,
       );
       const g = parseRoastJSON<Glowup>(raw);
-      return g && Array.isArray(g.rewrites) ? g : fallbackGlowup();
+      return { glowup: g && Array.isArray(g.rewrites) ? g : fallbackGlowup() };
     } catch {
-      return fallbackGlowup();
+      return { glowup: fallbackGlowup() };
     }
   }
   try {
     const res = await fetch("/api/glowup", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, passToken: args.passToken }),
+      body: JSON.stringify({ text, passToken: args.passToken, paid: args.paid }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    // Pass out of Glow-Ups → tell the caller to send the user to the ₹49 paywall.
+    if (res.status === 402 && data?.error === "glowups_exhausted") {
+      return { glowup: fallbackGlowup(), glowupsLeft: 0, exhausted: true };
+    }
     const g = data?.glowup;
-    return g && Array.isArray(g.rewrites) ? g : fallbackGlowup();
+    return {
+      glowup: g && Array.isArray(g.rewrites) ? g : fallbackGlowup(),
+      glowupsLeft:
+        typeof data?.glowupsLeft === "number" ? data.glowupsLeft : undefined,
+    };
   } catch {
-    return fallbackGlowup();
+    return { glowup: fallbackGlowup() };
   }
 }
 

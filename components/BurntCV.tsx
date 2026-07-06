@@ -11,9 +11,11 @@ import {
   fetchRegion,
   startCreemCheckout,
   claimCreem,
+  PRICES,
   type Plan,
 } from "@/lib/payments";
 import { load, PASS_MS, persist, type HistoryItem } from "@/lib/storage";
+import { GLOWUPS_PER_PASS } from "@/lib/plan";
 import {
   fallbackRoast,
   INTENSITIES,
@@ -49,7 +51,7 @@ const LOADING_MSGS = [
 const PASS_PERKS = [
   "5 roasts a day for 6 months",
   "All 6 roaster personas + Unhinged 💀",
-  "The Glow-Up fix-list",
+  `${GLOWUPS_PER_PASS} Glow-Up rewrites included (₹49 each)`,
   "Watermark-free share cards",
 ];
 
@@ -81,6 +83,7 @@ export default function BurntCV() {
   const [passUntil, setPassUntil] = useState(0);
   const [passToken, setPassToken] = useState("");
   const [passCode, setPassCode] = useState("");
+  const [glowupsLeft, setGlowupsLeft] = useState(0);
   const [freeRoastUsed, setFreeRoastUsed] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [keyDraft, setKeyDraft] = useState("");
@@ -110,6 +113,7 @@ export default function BurntCV() {
     setPassUntil(u.passUntil);
     setPassToken(u.passToken);
     setPassCode(u.passCode);
+    setGlowupsLeft(u.glowupsLeft);
     setFreeRoastUsed(u.freeRoastUsed);
     setApiKey(u.apiKey);
     setKeyDraft(u.apiKey);
@@ -137,13 +141,16 @@ export default function BurntCV() {
       if (cid) {
         claimCreem(cid).then((pass) => {
           if (pass) {
+            const gl = pass.glowupsLeft ?? GLOWUPS_PER_PASS;
             setPassUntil(pass.passUntil);
             setPassToken(pass.token);
             setPassCode(pass.code);
+            setGlowupsLeft(gl);
             persist({
               passUntil: pass.passUntil,
               passToken: pass.token,
               passCode: pass.code,
+              glowupsLeft: gl,
             });
             toastMsg("6-Month Pass unlocked 🔥 — restore code saved in Settings");
           } else {
@@ -347,27 +354,46 @@ export default function BurntCV() {
     go("paywall");
   }, [resumeText, byok, hasPass, roastsToday, freeRoastUsed, intensity, go, toastMsg, doRoast]);
 
-  // Runs the actual Glow-Up call (used by the free path and after a ₹7 purchase).
-  const execGlowup = useCallback(async () => {
-    setGlowupLoading(true);
-    setGlowup(null);
-    setMenuOpen(false);
-    ev("glowup_run");
-    go("glowup");
-    const g = await requestGlowup({ text: resumeText, apiKey, passToken });
-    setGlowup(g);
-    setGlowupLoading(false);
-  }, [go, resumeText, apiKey, passToken]);
+  // Runs the actual Glow-Up call. `paid=true` means the user just paid ₹49 for
+  // this one, so the server must NOT spend a Pass credit on it.
+  const execGlowup = useCallback(
+    async (paid = false) => {
+      setGlowupLoading(true);
+      setGlowup(null);
+      setMenuOpen(false);
+      ev("glowup_run");
+      go("glowup");
+      const res = await requestGlowup({ text: resumeText, apiKey, passToken, paid });
+      // Race guard: the Pass looked like it had credits but the server says it's
+      // out — refund the optimistic UI and route to the ₹49 paywall.
+      if (res.exhausted) {
+        setGlowupsLeft(0);
+        persist({ glowupsLeft: 0 });
+        setGlowupLoading(false);
+        setPaywallReason("glowup");
+        go("paywall");
+        return;
+      }
+      if (typeof res.glowupsLeft === "number") {
+        setGlowupsLeft(res.glowupsLeft);
+        persist({ glowupsLeft: res.glowupsLeft });
+      }
+      setGlowup(res.glowup);
+      setGlowupLoading(false);
+    },
+    [go, resumeText, apiKey, passToken],
+  );
 
-  // Pass holders & BYOK get the Glow-Up free; everyone else pays ₹7.
+  // BYOK is free; a Pass spends one of its 4 included Glow-Ups; everyone else
+  // (and Pass holders who've used their 4) pays ₹49.
   const runGlowup = useCallback(() => {
-    if (hasPass || byok) {
+    if (byok || (hasPass && glowupsLeft > 0)) {
       execGlowup();
       return;
     }
     setPaywallReason("glowup");
     go("paywall");
-  }, [hasPass, byok, execGlowup, go]);
+  }, [byok, hasPass, glowupsLeft, execGlowup, go]);
 
   const buy = useCallback(
     async (plan: Plan) => {
@@ -387,13 +413,16 @@ export default function BurntCV() {
         // fall back to a local pass in simulated/offline mode.
         const p = res.pass;
         const until = p?.passUntil ?? Date.now() + PASS_MS;
+        const gl = p?.glowupsLeft ?? GLOWUPS_PER_PASS;
         setPassUntil(until);
         setPassToken(p?.token ?? "");
         setPassCode(p?.code ?? "");
+        setGlowupsLeft(gl);
         persist({
           passUntil: until,
           passToken: p?.token ?? "",
           passCode: p?.code ?? "",
+          glowupsLeft: gl,
         });
         toastMsg(
           p?.code
@@ -416,9 +445,9 @@ export default function BurntCV() {
           }
         }, 80);
       } else if (plan === "glowup") {
-        // ₹7 Glow-Up — pay then run the fix-list on the current roast.
+        // ₹49 Glow-Up — a paid top-up, so don't spend a Pass credit on it.
         toastMsg(res.simulated ? "Glow-Up unlocked (demo) ✨" : "Glow-Up unlocked ✨");
-        setTimeout(() => execGlowup(), 80);
+        setTimeout(() => execGlowup(true), 80);
       } else {
         // ₹7 single — pay then roast this one now (no stored balance).
         toastMsg(res.simulated ? "Roast unlocked (demo) 🔥" : "Roast unlocked 🔥");
@@ -455,13 +484,16 @@ export default function BurntCV() {
       toastMsg("No active Pass found for that code/email.");
       return;
     }
+    const gl = pass.glowupsLeft ?? GLOWUPS_PER_PASS;
     setPassUntil(pass.passUntil);
     setPassToken(pass.token);
     setPassCode(pass.code);
+    setGlowupsLeft(gl);
     persist({
       passUntil: pass.passUntil,
       passToken: pass.token,
       passCode: pass.code,
+      glowupsLeft: gl,
     });
     setRestoreInput("");
     toastMsg("Pass restored 🔥");
@@ -580,12 +612,15 @@ export default function BurntCV() {
           year: "numeric",
         })
       : "";
+  const isIN = region === "IN";
   const usageLabel = byok
     ? "∞ Key"
     : hasPass
       ? `${roastsToday}/5`
       : freeRoastUsed
-        ? "₹7/roast"
+        ? isIN
+          ? "₹7/roast"
+          : "Pass"
         : "1 free";
   const usagePct =
     byok || (!hasPass && !freeRoastUsed)
@@ -597,10 +632,14 @@ export default function BurntCV() {
     ? "Unlimited via your own Claude API key."
     : hasPass
       ? roastsToday >= 5
-        ? "You’ve used today’s 5 roasts — back tomorrow, or grab a ₹5 top-up."
-        : `6-Month Pass: 5 roasts a day. Renews ${passExpiry}.`
+        ? isIN
+          ? "You’ve used today’s 5 roasts — back tomorrow, or grab a ₹5 top-up."
+          : "You’ve used today’s 5 roasts — back tomorrow."
+        : `6-Month Pass: 5 roasts a day · ${glowupsLeft} Glow-Up${glowupsLeft === 1 ? "" : "s"} left. Renews ${passExpiry}.`
       : freeRoastUsed
-        ? "Your free roast is used. ₹7 per roast, or ₹199 for 5 a day for 6 months."
+        ? isIN
+          ? "Your free roast is used. ₹7 per roast, or ₹199 for 5 a day for 6 months."
+          : "Your free roast is used. Get the 6-Month Pass for 5 a day, 6 months."
         : "Your first roast is on us — everything unlocked.";
 
   const cardLabel = isLinkedIn
@@ -616,7 +655,6 @@ export default function BurntCV() {
 
   const isGlowup = paywallReason === "glowup";
   const isUnhinged = paywallReason === "unhinged";
-  const isIN = region === "IN";
   const paywallEmoji =
     paywallReason === "daily"
       ? "🔥"
@@ -648,7 +686,7 @@ export default function BurntCV() {
         ? "Get the 6-Month Pass to drop the watermark on every card you share."
         : isGlowup
           ? isIN
-            ? "The roast found the flaws — the Glow-Up rewrites them into callback bullets. ₹7, or free on the 6-Month Pass."
+            ? "The roast found the flaws — the Glow-Up rewrites them into callback bullets. ₹49, or 4 included with the 6-Month Pass."
             : "The roast found the flaws — the Glow-Up rewrites them into callback bullets. Free on the 6-Month Pass."
           : isUnhinged
             ? isIN
@@ -665,12 +703,14 @@ export default function BurntCV() {
   // world (Creem) sees only the $7.20 Pass — micro-payments don't survive
   // international fees.
   const showSingle = isIN && paywallReason !== "watermark";
-  const showLifetime = isIN && paywallReason !== "daily";
-  const showCreem = !isIN && paywallReason !== "daily";
-  // Pass holders past 5/day pay a ₹5 top-up; Glow-Up and a single roast are ₹7.
+  // Don't re-upsell the Pass to someone who already holds one (e.g. a Pass
+  // holder who's used their 4 Glow-Ups and is now buying a ₹49 top-up).
+  const showLifetime = isIN && paywallReason !== "daily" && !hasPass;
+  const showCreem = !isIN && paywallReason !== "daily" && !hasPass;
+  // Pass holders past 5/day pay a ₹5 top-up; the Glow-Up is ₹49; a single roast ₹7.
   const isDaily = paywallReason === "daily";
   const payPlan: Plan = isGlowup ? "glowup" : isDaily ? "topup" : "single";
-  const payRupees = isDaily ? 5 : 7;
+  const payRupees = PRICES[payPlan].rupees;
 
   const tabBtn = (active: boolean) =>
     "flex:1;border:none;cursor:pointer;padding:11px 6px;border-radius:9px;font-weight:700;font-size:13px;" +
@@ -1284,7 +1324,14 @@ export default function BurntCV() {
                       "flex:1;border:1.5px solid #4e3188;background:#fff;color:#4e3188;cursor:pointer;padding:13px;border-radius:13px;font-weight:800;font-size:14px;",
                     )}
                   >
-                    ✨ The Glow-Up{hasPass || byok ? "" : " · ₹7"}
+                    ✨ The Glow-Up
+                    {byok
+                      ? ""
+                      : hasPass
+                        ? glowupsLeft > 0
+                          ? ` · ${glowupsLeft} left`
+                          : " · ₹49"
+                        : " · ₹49"}
                   </button>
                   <button
                     onClick={() => go("input")}
@@ -1956,10 +2003,10 @@ export default function BurntCV() {
                   <div style={css("position:relative;")}>
                     <div style={css("font-weight:800;font-size:15px;")}>Get the 6-Month Pass 🔥</div>
                     <div style={css("font-size:12.5px;color:rgba(255,255,255,.65);margin-top:3px;")}>
-                      5 roasts/day for 6 months · all personas · no watermark
+                      5 roasts/day · {GLOWUPS_PER_PASS} Glow-Ups · no watermark · 6 months
                     </div>
                   </div>
-                  <span style={css("position:relative;font-weight:800;font-size:15px;")}>₹199 →</span>
+                  <span style={css("position:relative;font-weight:800;font-size:15px;")}>{isIN ? "₹199" : "$7.20"} →</span>
                 </div>
               )}
               {hasPass && (
@@ -2112,7 +2159,7 @@ export default function BurntCV() {
               <MenuItem onClick={() => go("input")} label="🔥 New roast" />
               <MenuItem onClick={() => go("history")} label="🗒️ Roast history" />
               <MenuItem onClick={() => go("settings")} label="⚙️ Settings & API key" />
-              <MenuItem onClick={goPaywall} label="⚡ Get the 6-Month Pass · ₹199" color="#ed3237" />
+              <MenuItem onClick={goPaywall} label={`⚡ Get the 6-Month Pass · ${isIN ? "₹199" : "$7.20"}`} color="#ed3237" />
               <MenuItem onClick={goHome} label="← Back to home" color="#808080" />
             </div>
           </>
