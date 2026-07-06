@@ -11,6 +11,7 @@ export async function sendEmail(args: {
   to: string;
   subject: string;
   html: string;
+  replyTo?: string; // e.g. a feedback sender's email → you can reply directly
 }): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM || "BurntCV <passes@burntcv.fun>";
@@ -25,7 +26,13 @@ export async function sendEmail(args: {
         authorization: `Bearer ${key}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ from, to: args.to, subject: args.subject, html: args.html }),
+      body: JSON.stringify({
+        from,
+        to: args.to,
+        subject: args.subject,
+        html: args.html,
+        ...(args.replyTo ? { reply_to: args.replyTo } : {}),
+      }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
@@ -59,6 +66,40 @@ export function restoreEmailHtml(link: string): string {
         link is opened. Trouble with the button? Paste this into your browser:<br/>
         <span style="word-break:break-all;color:#4e3188;">${link}</span>
       </p>
+    </div>
+  </body>
+</html>`;
+}
+
+// Escape user-supplied text before dropping it into the feedback email HTML.
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// The internal feedback notification email (goes to FEEDBACK_TO).
+export function feedbackEmailHtml(args: {
+  type: string;
+  message: string;
+  email?: string;
+}): string {
+  const from = args.email ? esc(args.email) : "— not provided —";
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#faf9f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f0623;">
+    <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
+      <div style="font-size:13px;font-weight:800;letter-spacing:.06em;color:#ed3237;text-transform:uppercase;">
+        New BurntCV feedback · ${esc(args.type)}
+      </div>
+      <div style="background:#fff;border:1px solid rgba(15,6,35,.1);border-radius:14px;padding:18px 20px;margin:16px 0;">
+        <div style="font-size:15px;line-height:1.6;white-space:pre-wrap;">${esc(args.message)}</div>
+      </div>
+      <div style="font-size:13px;color:#5a5a5a;">
+        From: <strong>${from}</strong>${args.email ? " — just hit Reply to respond." : ""}
+      </div>
     </div>
   </body>
 </html>`;

@@ -102,4 +102,41 @@ export async function checkRestore(ip: string): Promise<boolean> {
   return memRestoreCheck(ip);
 }
 
+// ---- feedback endpoint limiter ----
+// The feedback form is a public POST → cap submissions per IP so it can't be
+// used to spam the inbox.
+const FEEDBACK_PER_HOUR = Number(process.env.FEEDBACK_PER_HOUR ?? 5);
+const feedbackLimiter = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.fixedWindow(FEEDBACK_PER_HOUR, "1 h"),
+      prefix: "burntcv:feedback",
+      analytics: false,
+    })
+  : null;
+const memFeedback = new Map<string, Hourly>();
+
+function memFeedbackCheck(ip: string): boolean {
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const e = memFeedback.get(ip);
+  const count = e && e.hour === hour ? e.count : 0;
+  if (count >= FEEDBACK_PER_HOUR) return false;
+  memFeedback.set(ip, { hour, count: count + 1 });
+  return true;
+}
+
+// Returns false when this IP has exceeded the feedback budget this hour.
+export async function checkFeedback(ip: string): Promise<boolean> {
+  if (feedbackLimiter) {
+    try {
+      const { success } = await feedbackLimiter.limit(ip);
+      return success;
+    } catch (err) {
+      console.error("[ratelimit] feedback upstash error, falling back:", err);
+      return memFeedbackCheck(ip);
+    }
+  }
+  return memFeedbackCheck(ip);
+}
+
 export const usingDurableRateLimit = !!upstashLimiter;

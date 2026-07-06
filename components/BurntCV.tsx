@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { css } from "./css";
 import Landing from "./Landing";
+import FeedbackForm from "./FeedbackForm";
 import { extractPdf, requestGlowup, requestRoast } from "@/lib/client";
 import { ev } from "@/lib/analytics";
 import {
@@ -32,6 +33,10 @@ import {
 // after which the holder buys a new Pass. India stays on the 5-roasts/day model.
 const INTL_ROAST_CAP = 400;
 
+// useLayoutEffect on the client (avoids the scroll-reset flicker), useEffect on
+// the server (React would otherwise warn during SSR).
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 // How a roast is paid for, resolved before the API call and used for accounting.
 type Consume = "byok" | "lifetime" | "free" | "paid";
 
@@ -44,7 +49,8 @@ type Screen =
   | "glowup"
   | "paywall"
   | "settings"
-  | "history";
+  | "history"
+  | "feedback";
 
 const LOADING_MSGS = [
   "Reading between the lines…",
@@ -247,6 +253,15 @@ export default function BurntCV() {
   const screenRef = useRef<Screen>("landing");
   useEffect(() => {
     screenRef.current = screen;
+  }, [screen]);
+
+  // Reset the scroll container to the top on every screen change so a new screen
+  // (esp. the paywall) always opens at its top — otherwise it inherits the prior
+  // screen's scroll position and the pay button can land above the fold, forcing
+  // the user to scroll up to find it.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useIsoLayoutEffect(() => {
+    scrollRef.current?.scrollTo(0, 0);
   }, [screen]);
 
   const go = useCallback((s: Screen) => {
@@ -981,7 +996,7 @@ export default function BurntCV() {
           </div>
         </div>
 
-        <div style={css("flex:1;overflow-y:auto;")}>
+        <div ref={scrollRef} style={css("flex:1;overflow-y:auto;")}>
           {/* ===== SETUP ===== */}
           {screen === "input" && (
             <>
@@ -2478,6 +2493,21 @@ export default function BurntCV() {
             </div>
           )}
 
+          {/* ===== FEEDBACK ===== */}
+          {screen === "feedback" && (
+            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px;")}>
+              <div>
+                <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:0 0 5px;")}>
+                  Feedback
+                </h2>
+                <p style={css("margin:0;font-size:13.5px;color:#5a5a5a;line-height:1.5;")}>
+                  A bug, an idea, or a reaction — it shapes what we build next.
+                </p>
+              </div>
+              <FeedbackForm compact />
+            </div>
+          )}
+
           {/* ===== HISTORY ===== */}
           {screen === "history" && (
             <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px;")}>
@@ -2556,6 +2586,7 @@ export default function BurntCV() {
               <MenuItem onClick={() => go("input")} label="🔥 New roast" />
               <MenuItem onClick={() => go("history")} label="🗒️ Roast history" />
               <MenuItem onClick={() => go("settings")} label="⚙️ Settings & API key" />
+              <MenuItem onClick={() => go("feedback")} label="💬 Feedback" />
               <MenuItem onClick={goPaywall} label={`⚡ Get the 6-Month Pass · ${isIN ? "₹199" : "$9.99"}`} color="#ed3237" />
               <MenuItem onClick={goHome} label="← Back to home" color="#808080" />
             </div>

@@ -106,6 +106,10 @@ export default function Footer() {
                 {l.label}
               </Link>
             ))}
+            {/* Feedback navigates to the real page (not the policy pop-up). */}
+            <Link href="/feedback" style={css("color:#5a5a5a;cursor:pointer;")}>
+              Feedback
+            </Link>
           </nav>
         </div>
         <div
