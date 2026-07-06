@@ -8,6 +8,8 @@ import { ev } from "@/lib/analytics";
 import {
   purchase,
   restoreEntitlement,
+  requestMagicLink,
+  claimMagicLink,
   fetchRegion,
   startCreemCheckout,
   claimCreem,
@@ -212,6 +214,31 @@ export default function BurntCV() {
           }
         });
       }
+    }
+
+    // Magic-link Pass restore → the emailed link lands here with ?restore=<token>.
+    // Verify it server-side and apply the Pass on this device.
+    const restoreTok = params.get("restore");
+    if (restoreTok) {
+      window.history.replaceState(null, "", "/");
+      claimMagicLink(restoreTok).then((pass) => {
+        if (pass) {
+          const gl = pass.glowupsLeft ?? GLOWUPS_PER_PASS;
+          setPassUntil(pass.passUntil);
+          setPassToken(pass.token);
+          setPassCode(pass.code);
+          setGlowupsLeft(gl);
+          persist({
+            passUntil: pass.passUntil,
+            passToken: pass.token,
+            passCode: pass.code,
+            glowupsLeft: gl,
+          });
+          toastMsg("Pass restored 🔥");
+        } else {
+          toastMsg("That restore link is invalid or expired — request a new one.");
+        }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -613,12 +640,22 @@ export default function BurntCV() {
     const val = restoreInput.trim();
     if (!val) return;
     setRestoring(true);
-    const pass = await restoreEntitlement(
-      val.includes("@") ? { email: val } : { code: val },
-    );
+
+    // An email can't restore directly (that would be Pass theft) — we email a
+    // one-tap link to the address on file instead. A code restores instantly.
+    if (val.includes("@")) {
+      await requestMagicLink(val);
+      setRestoring(false);
+      setRestoreInput("");
+      // Uniform message whether or not that email has a Pass (no enumeration).
+      toastMsg("If that email has a Pass, we’ve sent a restore link — check your inbox 📬");
+      return;
+    }
+
+    const pass = await restoreEntitlement({ code: val });
     setRestoring(false);
     if (!pass) {
-      toastMsg("No active Pass found for that code/email.");
+      toastMsg("No active Pass found for that code.");
       return;
     }
     const gl = pass.glowupsLeft ?? GLOWUPS_PER_PASS;
@@ -2409,7 +2446,8 @@ export default function BurntCV() {
                     ↩︎ Restore a purchase
                   </div>
                   <p style={css("margin:7px 0 11px;font-size:12.5px;color:#5a5a5a;line-height:1.5;")}>
-                    Bought a Pass on another device? Enter your restore code or the email you paid with.
+                    Bought a Pass on another device? Enter your restore code for instant
+                    access — or your email, and we’ll send a one-tap restore link.
                   </p>
                   <div style={css("display:flex;gap:9px;")}>
                     <input

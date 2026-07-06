@@ -128,16 +128,48 @@ export async function purchase(plan: Plan): Promise<PurchaseResult> {
   });
 }
 
-// Restore a Pass on a new device via the restore code or the paid email.
+// Restore a Pass on a new device with the SECRET restore code. (Email-only
+// restore is disabled server-side — use requestMagicLink for email recovery.)
 export async function restoreEntitlement(input: {
   code?: string;
-  email?: string;
 }): Promise<PassEntitlement | null> {
   try {
     const res = await fetch("/api/entitlement/restore", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.pass as PassEntitlement) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Ask us to email a one-tap restore link to the address on file. Always resolves
+// true on a well-formed request (the server won't reveal whether the email has a
+// Pass), so the UI shows the same "check your inbox" message either way.
+export async function requestMagicLink(email: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/entitlement/magic-link", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Complete a magic-link restore from the ?restore=<token> URL param.
+export async function claimMagicLink(token: string): Promise<PassEntitlement | null> {
+  try {
+    const res = await fetch("/api/entitlement/magic-claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
     });
     if (!res.ok) return null;
     const data = await res.json();

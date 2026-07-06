@@ -303,3 +303,51 @@ export async function restorePass(args: {
   if (rec.passUntil < Date.now()) return null; // expired
   return buildPassResult(rec);
 }
+
+// ---- magic-link restore ----
+// Secure email restore: the requester never gets a token directly (that was the
+// theft hole). Instead we email a short-lived, signed link to the address on
+// file, so only the mailbox owner can complete the restore.
+
+// Look up the Pass code registered to a paying email (indexed on purchase).
+export async function codeForEmail(email: string): Promise<string | null> {
+  const e = email?.trim().toLowerCase();
+  if (!e) return null;
+  return (await kvGet(`ent:email:${e}`)) ?? null;
+}
+
+interface MagicClaims {
+  t: "magic";
+  code: string;
+  exp: number; // epoch ms; link is dead after this
+}
+
+const MAGIC_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+// Mint a signed, short-lived token that proves "the holder of this link may
+// restore Pass <code>". Same HMAC scheme as the Pass token, different type.
+export function signMagicToken(code: string): string {
+  const claims: MagicClaims = { t: "magic", code, exp: Date.now() + MAGIC_TTL_MS };
+  const body = b64url(JSON.stringify(claims));
+  const sig = b64url(createHmac("sha256", SECRET).update(body).digest());
+  return `${body}.${sig}`;
+}
+
+// Verify a magic token → the Pass code it authorizes, or null if bad/expired.
+export function verifyMagicToken(token: string | undefined | null): string | null {
+  if (!token || !SECRET) return null;
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+  const expected = b64url(createHmac("sha256", SECRET).update(body).digest());
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(body, "base64url").toString()) as MagicClaims;
+    if (claims.t !== "magic" || typeof claims.exp !== "number") return null;
+    if (claims.exp < Date.now()) return null; // expired
+    return typeof claims.code === "string" ? claims.code : null;
+  } catch {
+    return null;
+  }
+}
