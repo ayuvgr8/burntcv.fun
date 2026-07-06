@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
     if (orderId && isPass) {
       const email = pay?.email && pay.email !== "void@razorpay.com" ? pay.email : "";
-      await ensurePassForOrder({ orderId, email });
+      await ensurePassForOrder({ orderId, email, region: "IN" });
       console.log("[webhook] pass granted for order", orderId);
     }
   } catch (err) {

@@ -17,7 +17,7 @@ export default async function OG() {
           flexDirection: "column",
           background: "#0f0623",
           color: "#fff",
-          padding: "72px",
+          padding: "64px",
           position: "relative",
           fontFamily: "sans-serif",
         }}
@@ -65,24 +65,24 @@ export default async function OG() {
         <div
           style={{
             display: "flex",
-            marginTop: 70,
-            fontSize: 60,
+            marginTop: 52,
+            fontSize: 52,
             lineHeight: 1.15,
             fontWeight: 800,
             letterSpacing: "-0.02em",
             maxWidth: 980,
           }}
         >
-          “A document that confidently says nothing, in Calibri.”
+          “‘Passionate self-starter’ — three words, zero evidence, one Calibri.”
         </div>
 
-        <div style={{ display: "flex", height: 2, background: "rgba(255,255,255,.15)", margin: "48px 0" }} />
+        <div style={{ display: "flex", height: 2, background: "rgba(255,255,255,.15)", margin: "36px 0" }} />
 
         <div style={{ display: "flex", fontSize: 24, letterSpacing: 6, color: "#f98731", fontWeight: 700 }}>
           🌑 DARK TRUTH
         </div>
         <div style={{ display: "flex", marginTop: 16, fontSize: 30, lineHeight: 1.4, color: "rgba(255,255,255,.92)", maxWidth: 980 }}>
-          The two-year gap is the most honest line on the page. The ATS bot, tragically, has no soul.
+          You listed “Microsoft Office” as a skill. In 2026. Bold.
         </div>
 
         <div
@@ -96,7 +96,7 @@ export default async function OG() {
             color: "rgba(255,255,255,.6)",
           }}
         >
-          <div style={{ display: "flex" }}>burntcv.app</div>
+          <div style={{ display: "flex" }}>burntcv.fun</div>
           <div style={{ display: "flex", color: "#fff", fontWeight: 700 }}>roast yours →</div>
         </div>
       </div>

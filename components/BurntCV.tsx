@@ -97,7 +97,7 @@ const BENTO_PALETTES = [
 export default function BurntCV() {
   const [screen, setScreen] = useState<Screen>("landing");
   const [inputMode, setInputMode] = useState<"paste" | "upload" | "linkedin">(
-    "paste",
+    "upload",
   );
   const [isLinkedIn, setIsLinkedIn] = useState(false);
   const [resumeText, setResumeText] = useState("");
@@ -134,6 +134,7 @@ export default function BurntCV() {
   const [region, setRegion] = useState<"IN" | "INTL">("IN");
 
   const stack = useRef<Screen[]>([]);
+  const intensityRef = useRef<HTMLDivElement | null>(null);
   const loadingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -245,6 +246,14 @@ export default function BurntCV() {
     toastTimer.current = setTimeout(() => setToast(""), 2400);
   }, []);
 
+  // After a résumé loads, bring the intensity picker into view so the user's
+  // clear next step ("pick your pain tolerance" → Roast it) isn't below the fold.
+  const scrollToIntensity = useCallback(() => {
+    setTimeout(() => {
+      intensityRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }, []);
+
   const onFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const f = e.target.files?.[0];
@@ -258,6 +267,7 @@ export default function BurntCV() {
         if (text) {
           setResumeText(text.slice(0, 6000));
           toastMsg("PDF loaded 🔥");
+          scrollToIntensity();
         } else {
           toastMsg("Couldn’t read that PDF — paste the text for the sharpest roast.");
         }
@@ -273,11 +283,12 @@ export default function BurntCV() {
         if (txt.length < 30)
           toastMsg("Couldn’t read much text — paste it instead for the sharpest roast.");
         setResumeText(txt.slice(0, 6000));
+        if (txt.length >= 30) scrollToIntensity();
       };
       r.onerror = () => toastMsg("File read failed — try pasting the text.");
       r.readAsText(f);
     },
-    [toastMsg],
+    [toastMsg, scrollToIntensity],
   );
 
   // All personas & intensities are free to pick — you pay per roast, not per
@@ -322,6 +333,23 @@ export default function BurntCV() {
         setScreen("paywall");
         return;
       }
+      if (result.reason === "daily_exhausted") {
+        // Server rejected a Pass roast: India's 5/day are gone (local counter was
+        // stale/tampered) → sync it up and open the daily paywall.
+        setRoastsToday(5);
+        persist({ roastsToday: 5 });
+        setPaywallReason("daily");
+        setScreen("paywall");
+        return;
+      }
+      if (result.reason === "pass_exhausted") {
+        // Server rejected a Pass roast: all 400 are gone → sync + re-sell the Pass.
+        setPassRoasts(INTL_ROAST_CAP);
+        persist({ passRoasts: INTL_ROAST_CAP });
+        setPaywallReason("passcap");
+        setScreen("paywall");
+        return;
+      }
       if (result.reason === "overloaded") {
         toastMsg("The roaster's a bit overloaded 🔥 — give it another go.");
         setScreen("input");
@@ -352,16 +380,23 @@ export default function BurntCV() {
     setHistory(nextHistory);
     setScreen("result");
 
-    // Accounting: only 'lifetime' (daily quota) and 'free' (the one freebie)
-    // are metered. 'byok' and 'paid' need no accounting.
+    // Accounting: only 'lifetime' (Pass quota) and 'free' (the one freebie) are
+    // metered. 'byok' and 'paid' need no accounting. For Pass roasts the SERVER
+    // is authoritative — sync the region's counter from its `passRoastsLeft` so
+    // local storage can't drift out of (or be edited below) the truth.
     const patch: Record<string, unknown> = { history: nextHistory };
     if (consume === "lifetime") {
-      const inc = roastsToday + 1; // daily (India 5/day)
-      const life = passRoasts + 1; // lifetime (international 400-cap)
-      setRoastsToday(inc);
-      setPassRoasts(life);
-      patch.roastsToday = inc;
-      patch.passRoasts = life;
+      const left = result.passRoastsLeft;
+      if (isIN) {
+        const used = typeof left === "number" ? Math.max(0, 5 - left) : roastsToday + 1;
+        setRoastsToday(used);
+        patch.roastsToday = used;
+      } else {
+        const usedTot =
+          typeof left === "number" ? Math.max(0, INTL_ROAST_CAP - left) : passRoasts + 1;
+        setPassRoasts(usedTot);
+        patch.passRoasts = usedTot;
+      }
     } else if (consume === "free") {
       setFreeRoastUsed(true);
       patch.freeRoastUsed = true;
@@ -379,6 +414,7 @@ export default function BurntCV() {
     passToken,
     roastsToday,
     passRoasts,
+    isIN,
     history,
     toastMsg,
   ]);
@@ -844,7 +880,15 @@ export default function BurntCV() {
     return (
       <>
         {toast && <Toast toast={toast} />}
-        <Landing onRoast={() => go("input")} onLinkedIn={goLinkedIn} region={region} />
+        <Landing
+          onRoast={() => {
+            setIsLinkedIn(false);
+            setInputMode("upload");
+            go("input");
+          }}
+          onLinkedIn={goLinkedIn}
+          region={region}
+        />
       </>
     );
   }
@@ -939,26 +983,64 @@ export default function BurntCV() {
                   ))}
                 </div>
 
-                {inputMode === "upload" && (
-                  <label
-                    style={css(
-                      "border:2px dashed rgba(78,49,136,.35);border-radius:14px;padding:22px 16px;text-align:center;background:rgba(78,49,136,.03);cursor:pointer;display:block;",
-                    )}
-                  >
-                    <div style={css("font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#4e3188;")}>
-                      › {fileLabel}
-                    </div>
-                    <div style={css("font-size:12px;color:#9c9c9c;margin-top:6px;")}>
-                      PDF, TXT, or DOCX export · we read the text only
-                    </div>
-                    <input
-                      type="file"
-                      accept=".txt,.pdf,.doc,.docx,.md"
-                      onChange={onFile}
-                      style={css("display:none;")}
-                    />
-                  </label>
-                )}
+                {inputMode === "upload" &&
+                  (() => {
+                    const picked = fileLabel !== "drag a file or tap to upload";
+                    return (
+                      <label
+                        style={css(
+                          "position:relative;border:2px dashed;border-radius:15px;padding:14px 14px;text-align:left;cursor:pointer;display:flex;flex-direction:row;align-items:center;gap:13px;transition:all .18s;" +
+                            (picked
+                              ? "border-color:rgba(31,157,85,.55);background:rgba(31,157,85,.06);box-shadow:0 10px 26px -18px rgba(31,157,85,.5);"
+                              : "border-color:rgba(78,49,136,.5);background:linear-gradient(135deg,rgba(78,49,136,.08),rgba(234,76,137,.07));animation:uploadglow 2.6s ease-in-out infinite;"),
+                        )}
+                      >
+                        <div
+                          style={css(
+                            "flex-shrink:0;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;" +
+                              (picked
+                                ? "background:linear-gradient(135deg,#1f9d55,#12833f);box-shadow:0 8px 18px -8px rgba(31,157,85,.6);"
+                                : "background:linear-gradient(135deg,#f98731,#ed3237 60%,#ea4c89);box-shadow:0 8px 18px -8px rgba(237,50,55,.6);"),
+                          )}
+                        >
+                          {picked ? "✓" : "📄"}
+                        </div>
+                        <div style={css("flex:1;min-width:0;")}>
+                          <div
+                            style={css(
+                              "font-weight:800;font-size:14.5px;color:#0f0623;letter-spacing:-.01em;word-break:break-word;",
+                            )}
+                          >
+                            {picked ? fileLabel : "Drop your résumé here"}
+                          </div>
+                          <div
+                            style={css(
+                              "font-size:11.5px;color:#8a8690;margin-top:2px;line-height:1.4;",
+                            )}
+                          >
+                            {picked
+                              ? "Tap to swap for a different file"
+                              : "or drag & drop · PDF, TXT, or DOCX"}
+                          </div>
+                        </div>
+                        {!picked && (
+                          <span
+                            style={css(
+                              "flex-shrink:0;display:inline-flex;align-items:center;gap:6px;background:#0f0623;color:#fff;font-weight:800;font-size:13px;padding:9px 15px;border-radius:10px;box-shadow:0 8px 18px -10px rgba(15,6,35,.6);",
+                            )}
+                          >
+                            ⬆︎ Choose
+                          </span>
+                        )}
+                        <input
+                          type="file"
+                          accept=".txt,.pdf,.doc,.docx,.md"
+                          onChange={onFile}
+                          style={css("display:none;")}
+                        />
+                      </label>
+                    );
+                  })()}
 
                 {inputMode === "linkedin" && (
                   <div style={css("display:flex;flex-direction:column;gap:12px;")}>
@@ -1043,7 +1125,7 @@ export default function BurntCV() {
                   </span>
                 </div>
 
-                <div>
+                <div ref={intensityRef} style={css("scroll-margin-top:70px;")}>
                   <div
                     style={css(
                       "font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.14em;font-weight:700;color:#0f0623;margin-bottom:10px;",

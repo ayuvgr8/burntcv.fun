@@ -53,6 +53,18 @@ a {
     transform: translateX(-50%);
   }
 }
+/* Gentle attention glow on the upload dropzone so it reads as the next step. */
+@keyframes uploadglow {
+  0%,
+  100% {
+    box-shadow: 0 14px 34px -20px rgba(78, 49, 136, 0.5);
+    border-color: rgba(78, 49, 136, 0.5);
+  }
+  50% {
+    box-shadow: 0 16px 40px -16px rgba(234, 76, 137, 0.55);
+    border-color: rgba(234, 76, 137, 0.6);
+  }
+}
 @keyframes fadeup {
   from {
     opacity: 0;

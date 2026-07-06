@@ -37,6 +37,6 @@ export async function POST(req: Request) {
   }
 
   // Namespace the ref so Creem checkouts never collide with Razorpay orders.
-  const pass = await ensurePassForOrder({ orderId: `creem:${co.id}`, email: co.email });
+  const pass = await ensurePassForOrder({ orderId: `creem:${co.id}`, email: co.email, region: "INTL" });
   return NextResponse.json({ ok: true, kind: "pass", pass });
 }

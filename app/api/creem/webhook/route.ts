@@ -41,6 +41,7 @@ export async function POST(req: Request) {
         await ensurePassForOrder({
           orderId: `creem:${checkoutId}`,
           email: extractEmail(obj),
+          region: "INTL",
         });
         console.log("[creem webhook] pass granted for", checkoutId);
       }

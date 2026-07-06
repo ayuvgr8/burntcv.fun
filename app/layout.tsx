@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://burntcv.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://burntcv.fun";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "BurntCV — We read it so a recruiter doesn't have to suffer.",
+  title: "BurntCV — get your résumé roasted 🔥",
   description:
-    "Upload your résumé. Get roasted. Get the brutally honest, very funny truth your recruiter is too polite to say — your real career trajectory and one dark truth included. Under 30 seconds.",
+    "Your résumé says 'passionate self-starter.' It's lying. First roast free — go unhinged. We don't save your CV, or your feelings.",
   keywords: [
     "resume roast generator",
     "roast my cv",
@@ -17,16 +17,19 @@ export const metadata: Metadata = {
     "ai resume feedback",
   ],
   openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "BurntCV",
     title: "BurntCV — get your résumé roasted 🔥",
     description:
-      "I let an AI roast my résumé and I've never felt so seen 💀",
-    siteName: "BurntCV",
-    type: "website",
+      "First roast free. 6 roasters, 3 heat levels — go unhinged. We don't save your CV — or your feelings.",
   },
   twitter: {
     card: "summary_large_image",
     title: "BurntCV — get your résumé roasted 🔥",
-    description: "I let an AI roast my résumé and I've never felt so seen 💀",
+    description:
+      "First roast free. Go unhinged. We don't save your CV — or your feelings.",
+    creator: "@iamayuv",
   },
 };
 

@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
 import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
 import { budgetAvailable, recordSpend } from "@/lib/spendcap";
-import { verifyToken } from "@/lib/entitlements";
+import {
+  verifyToken,
+  consumePassRoast,
+  refundPassRoast,
+  type PassRegion,
+} from "@/lib/entitlements";
 import { getRedis } from "@/lib/redis";
 import {
   buildRoastPrompt,
@@ -35,11 +40,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "too_short" }, { status: 400 });
   }
 
-  // A server-verified Pass bypasses the per-IP roast ceiling; free / single /
-  // top-up roasts fall under it. (BYOK users call Anthropic directly and never
+  // A server-verified Pass bypasses the per-IP roast ceiling but is metered by
+  // its own allowance, enforced HERE so it can't be bypassed by editing browser
+  // storage: India 5/day, International 400-total. Free / single / top-up roasts
+  // fall under the per-IP ceiling. (BYOK users call Anthropic directly and never
   // reach this route.)
   const pass = verifyToken(body.passToken);
-  if (!pass) {
+  const passRegion: PassRegion = pass?.region === "INTL" ? "INTL" : "IN";
+  let passRoastsLeft: number | undefined;
+  if (pass) {
+    const consumed = await consumePassRoast(pass.code, passRegion);
+    if (!consumed.allowed) {
+      // Distinguish so the client opens the right paywall: India → daily top-up;
+      // International → buy a fresh Pass.
+      return NextResponse.json(
+        { error: passRegion === "INTL" ? "pass_exhausted" : "daily_exhausted" },
+        { status: 402 },
+      );
+    }
+    passRoastsLeft = consumed.remaining;
+  } else {
     const { allowed } = await checkAndIncrement(ipFrom(req));
     if (!allowed) {
       return NextResponse.json({ error: "rate_limited" }, { status: 429 });
@@ -52,6 +72,7 @@ export async function POST(req: Request) {
   // serving on the platform key and steer to BYOK (same UX as no key), Pass or
   // not. The hard financial backstop above the honor-system client-side cap.
   if (!(await budgetAvailable())) {
+    if (pass) await refundPassRoast(pass.code, passRegion); // didn't serve → give it back
     return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
   }
 
@@ -82,12 +103,14 @@ export async function POST(req: Request) {
     const msg = err instanceof Error ? err.message : "";
     if (msg === "no_api_key") {
       // No platform key configured — tell the client to prompt for BYOK.
+      if (pass) await refundPassRoast(pass.code, passRegion);
       return NextResponse.json({ error: "no_server_key" }, { status: 503 });
     }
     // Overloaded / rate-limited / timed out / gateway budget hit (402): ask the
     // client to retry rather than serving a canned roast that won't match theirs.
     if (/anthropic_(402|429|529)|aborted|timeout/i.test(msg)) {
       console.error("[roast] upstream overloaded:", msg);
+      if (pass) await refundPassRoast(pass.code, passRegion); // retryable → refund
       return NextResponse.json({ error: "overloaded" }, { status: 503 });
     }
     console.error("[roast] unexpected error:", msg);
@@ -107,5 +130,7 @@ export async function POST(req: Request) {
     ?.incr("roast:count")
     .catch(() => {});
 
-  return NextResponse.json({ roast });
+  // Hand back the server-truth remaining count (Pass roasts) so the client can
+  // sync its display and self-heal any drift/tamper in local storage.
+  return NextResponse.json({ roast, passRoastsLeft });
 }

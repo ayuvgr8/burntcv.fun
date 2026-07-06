@@ -91,15 +91,97 @@ export async function consumePassGlowup(code: string): Promise<number> {
   return GLOWUPS_PER_PASS - used;
 }
 
+// ---- Pass roast quota (server-enforced, tamper-proof) ----
+// The 5/day (India) and 400-total (International) caps are counted here, keyed by
+// the Pass code, so they can't be reset by editing browser storage. The signed
+// token proves which Pass — and which region's cap — is asking.
+//   • IN   → daily counter `ent:roastday:<code>:<UTC-date>`, cap ROASTS_PER_DAY,
+//            short TTL (rolls over each day).
+//   • INTL → lifetime counter `ent:roasttot:<code>`, cap INTL_PASS_ROAST_CAP,
+//            Pass-lifetime TTL.
+function utcDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function roastKey(code: string, region: PassRegion): string {
+  return region === "INTL"
+    ? `ent:roasttot:${code}`
+    : `ent:roastday:${code}:${utcDate()}`;
+}
+function roastCapFor(region: PassRegion): number {
+  return region === "INTL" ? INTL_PASS_ROAST_CAP : ROASTS_PER_DAY;
+}
+
+export interface RoastConsume {
+  allowed: boolean;
+  remaining: number; // roasts left AFTER this one (0 when denied)
+}
+
+// Atomically consume one Pass roast. Reverts the increment on overshoot so a
+// burst of concurrent requests can't push the counter past the cap.
+export async function consumePassRoast(
+  code: string,
+  region: PassRegion,
+): Promise<RoastConsume> {
+  const key = roastKey(code, region);
+  const cap = roastCapFor(region);
+  const ttl = region === "INTL" ? TTL_SECONDS : 2 * 24 * 60 * 60; // daily: ~2 days
+  let used: number;
+  if (redis) {
+    used = await redis.incr(key);
+    if (used === 1) await redis.expire(key, ttl);
+    if (used > cap) {
+      await redis.decr(key);
+      return { allowed: false, remaining: 0 };
+    }
+  } else {
+    used = Number((await kvGet(key)) || 0) + 1;
+    if (used > cap) return { allowed: false, remaining: 0 };
+    // Best-effort in-memory: the daily key is date-stamped so it naturally stops
+    // matching once the day rolls over; the total key rides the Pass TTL.
+    mem.set(key, { v: String(used), exp: Date.now() + ttl * 1000 });
+  }
+  return { allowed: true, remaining: cap - used };
+}
+
+// Give a consumed roast back — used when the roast fails AFTER we've counted it,
+// so a platform outage never silently burns a paid roast.
+export async function refundPassRoast(
+  code: string,
+  region: PassRegion,
+): Promise<void> {
+  const key = roastKey(code, region);
+  try {
+    if (redis) {
+      await redis.decr(key);
+    } else {
+      const cur = Number((await kvGet(key)) || 0);
+      if (cur > 0) mem.set(key, { v: String(cur - 1), exp: Date.now() + TTL_SECONDS * 1000 });
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+// Read-only remaining count (no consume).
+export async function passRoastsLeft(
+  code: string,
+  region: PassRegion,
+): Promise<number> {
+  const raw = await kvGet(roastKey(code, region));
+  const used = raw ? parseInt(raw, 10) || 0 : 0;
+  return Math.max(0, roastCapFor(region) - used);
+}
+
 // ---- signed token ----
 // NOTE: the token is HMAC-signed (tamper-proof) but NOT encrypted — the body is
-// readable base64. So it carries only non-sensitive claims: the Pass code and
-// expiry. The buyer's email is never embedded (it lives only in Redis, indexed
-// for restore). Verification needs nothing more than code + passUntil.
+// readable base64. So it carries only non-sensitive claims: the Pass code,
+// expiry, and region (which cap applies). The buyer's email is never embedded
+// (it lives only in Redis, indexed for restore).
 export interface PassClaims {
   t: "pass";
   passUntil: number;
   code: string;
+  region?: PassRegion; // absent on legacy tokens → treated as "IN"
 }
 
 function b64url(input: Buffer | string): string {
@@ -138,6 +220,7 @@ export interface PassRecord {
   code: string;
   orderId: string;
   createdAt: number;
+  region?: PassRegion; // absent on legacy records → treated as "IN"
 }
 
 function genCode(): string {
@@ -165,15 +248,23 @@ async function buildPassResult(rec: PassRecord): Promise<PassResult> {
   return {
     code: rec.code,
     passUntil: rec.passUntil,
-    token: signToken({ t: "pass", passUntil: rec.passUntil, code: rec.code }),
+    token: signToken({
+      t: "pass",
+      passUntil: rec.passUntil,
+      code: rec.code,
+      region: rec.region ?? "IN",
+    }),
     glowupsLeft: await passGlowupsLeft(rec.code),
   };
 }
 
-// Idempotent per Razorpay order — safe to call from both verify and webhook.
+// Idempotent per order — safe to call from both verify/claim and the webhook.
+// `region` fixes which roast cap the Pass carries: "IN" (Razorpay, 5/day) or
+// "INTL" (Creem, 400 total). Existing passes keep their stored region.
 export async function ensurePassForOrder(args: {
   orderId: string;
   email: string;
+  region?: PassRegion;
 }): Promise<PassResult> {
   const existingCode = await kvGet(`ent:order:${args.orderId}`);
   if (existingCode) {
@@ -189,6 +280,7 @@ export async function ensurePassForOrder(args: {
     code: genCode(),
     orderId: args.orderId,
     createdAt: Date.now(),
+    region: args.region ?? "IN",
   };
   await saveRecord(rec);
   return buildPassResult(rec);

@@ -22,8 +22,16 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const BYOK_MODEL = "claude-sonnet-4-6";
 
 export type RoastResult =
-  | { ok: true; roast: Roast }
-  | { ok: false; reason: "rate_limited" | "no_server_key" | "overloaded" };
+  | { ok: true; roast: Roast; passRoastsLeft?: number }
+  | {
+      ok: false;
+      reason:
+        | "rate_limited"
+        | "no_server_key"
+        | "overloaded"
+        | "daily_exhausted" // India Pass: today's 5 are gone
+        | "pass_exhausted"; // International Pass: all 400 are gone
+    };
 
 async function callClaudeDirect(prompt: string, apiKey: string): Promise<string> {
   const controller = new AbortController();
@@ -100,6 +108,13 @@ export async function requestRoast(args: {
     });
     if (res.status === 429) return { ok: false, reason: "rate_limited" };
     const data = await res.json().catch(() => ({}));
+    // Pass allowance spent (server-enforced) → route to the right paywall.
+    if (res.status === 402) {
+      return {
+        ok: false,
+        reason: data?.error === "pass_exhausted" ? "pass_exhausted" : "daily_exhausted",
+      };
+    }
     if (res.status === 503) {
       return {
         ok: false,
@@ -107,7 +122,12 @@ export async function requestRoast(args: {
       };
     }
     const roast = data?.roast;
-    return { ok: true, roast: isValidRoast(roast) ? roast : fallbackRoast() };
+    return {
+      ok: true,
+      roast: isValidRoast(roast) ? roast : fallbackRoast(),
+      passRoastsLeft:
+        typeof data?.passRoastsLeft === "number" ? data.passRoastsLeft : undefined,
+    };
   } catch {
     return { ok: true, roast: fallbackRoast() };
   }

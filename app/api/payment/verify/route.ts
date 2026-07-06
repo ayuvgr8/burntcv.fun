@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   if (body.plan === "lifetime") {
     try {
       const email = await fetchPaymentEmail(razorpay_payment_id);
-      const pass = await ensurePassForOrder({ orderId: razorpay_order_id, email });
+      const pass = await ensurePassForOrder({ orderId: razorpay_order_id, email, region: "IN" });
       return NextResponse.json({ ok: true, pass });
     } catch (err) {
       console.error("[payment] entitlement mint failed:", err);
