@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { css } from "./css";
-import Footer from "./Footer";
 import { OPERATOR, POLICY_UPDATED } from "@/lib/operator";
 
 // Shared shell for the policy pages (Terms, Privacy, Refund, Shipping,
@@ -87,8 +86,6 @@ export default function LegalPage({
         )}
         {children}
       </main>
-
-      <Footer />
     </div>
   );
 }

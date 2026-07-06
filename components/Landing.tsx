@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { css } from "./css";
-import Footer from "./Footer";
 import { PERSONAS, INTENSITIES } from "@/lib/roast";
 
 // ---------------------------------------------------------------------------
@@ -872,8 +871,6 @@ export default function Landing({
           </div>
         </div>
       </section>
-
-      <Footer />
     </div>
   );
 }

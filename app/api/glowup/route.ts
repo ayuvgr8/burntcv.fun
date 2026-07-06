@@ -27,17 +27,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "too_short" }, { status: 400 });
   }
 
-  // A valid Pass token bypasses the limit (Glow-Up is included with the Pass);
-  // everyone else is IP-limited so the ₹7 gate can't be bypassed by calling the
-  // route directly. (BYOK never reaches here — it runs direct from the browser.)
+  // Everyone who reaches here uses the platform key (BYOK runs in the browser),
+  // so the global daily spend cap applies to all — Pass holders included.
+  if (!(await budgetAvailable())) {
+    return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
+  }
+  // A valid Pass token bypasses the per-IP limit (Glow-Up is included with the
+  // Pass); everyone else is IP-limited so the ₹7 gate can't be bypassed by
+  // calling the route directly.
   if (!verifyToken(body.passToken)) {
     const { allowed } = await checkAndIncrement(ipFrom(req));
     if (!allowed) {
       return NextResponse.json({ error: "rate_limited" }, { status: 429 });
-    }
-    // Glowup runs on the platform key too — respect the same daily spend cap.
-    if (!(await budgetAvailable())) {
-      return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
     }
   }
 
