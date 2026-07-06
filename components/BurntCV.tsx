@@ -5,7 +5,14 @@ import { css } from "./css";
 import Landing from "./Landing";
 import { extractPdf, requestGlowup, requestRoast } from "@/lib/client";
 import { ev } from "@/lib/analytics";
-import { purchase, restoreEntitlement, type Plan } from "@/lib/payments";
+import {
+  purchase,
+  restoreEntitlement,
+  fetchRegion,
+  startCreemCheckout,
+  claimCreem,
+  type Plan,
+} from "@/lib/payments";
 import { load, PASS_MS, persist, type HistoryItem } from "@/lib/storage";
 import {
   fallbackRoast,
@@ -88,6 +95,9 @@ export default function BurntCV() {
     "roast" | "daily" | "watermark" | "glowup" | "unhinged" | "upsell" | null
   >(null);
 
+  // Payment region: India → Razorpay/UPI, everyone else → Creem ($7.20 Pass).
+  const [region, setRegion] = useState<"IN" | "INTL">("IN");
+
   const stack = useRef<Screen[]>([]);
   const loadingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,14 +116,43 @@ export default function BurntCV() {
     setRoastsToday(u.roastsToday);
     setHistory(u.history);
 
+    // Which payment rail to show (India → Razorpay, else → Creem).
+    fetchRegion().then(setRegion);
+
+    const params = new URLSearchParams(window.location.search);
+
     // Deep-link from the /linkedin landing page → jump into the LinkedIn flow.
-    if (new URLSearchParams(window.location.search).get("li") === "1") {
+    if (params.get("li") === "1") {
       setInputMode("linkedin");
       setIsLinkedIn(true);
       setScreen("input");
       stack.current = ["landing"];
       window.history.replaceState(null, "", "/");
     }
+
+    // Return from a Creem checkout → confirm payment server-side + apply the Pass.
+    if (params.get("creem") === "success") {
+      const cid = params.get("checkout_id");
+      window.history.replaceState(null, "", "/");
+      if (cid) {
+        claimCreem(cid).then((pass) => {
+          if (pass) {
+            setPassUntil(pass.passUntil);
+            setPassToken(pass.token);
+            setPassCode(pass.code);
+            persist({
+              passUntil: pass.passUntil,
+              passToken: pass.token,
+              passCode: pass.code,
+            });
+            toastMsg("6-Month Pass unlocked 🔥 — restore code saved in Settings");
+          } else {
+            toastMsg("Couldn’t confirm that payment — email us if you were charged.");
+          }
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // keep a live ref of current screen for the stack push
@@ -392,6 +431,18 @@ export default function BurntCV() {
     [paywallReason, toastMsg, goBack, doRoast, execGlowup],
   );
 
+  // International Pass → redirect to Creem's hosted checkout. On return the mount
+  // effect claims the Pass. If Creem isn't reachable, tell the user.
+  const [creemLoading, setCreemLoading] = useState(false);
+  const buyCreem = useCallback(async () => {
+    setCreemLoading(true);
+    const ok = await startCreemCheckout();
+    if (!ok) {
+      setCreemLoading(false);
+      toastMsg("Couldn’t open checkout — try again in a moment.");
+    }
+  }, [toastMsg]);
+
   const restorePassFromInput = useCallback(async () => {
     const val = restoreInput.trim();
     if (!val) return;
@@ -565,6 +616,7 @@ export default function BurntCV() {
 
   const isGlowup = paywallReason === "glowup";
   const isUnhinged = paywallReason === "unhinged";
+  const isIN = region === "IN";
   const paywallEmoji =
     paywallReason === "daily"
       ? "🔥"
@@ -589,18 +641,32 @@ export default function BurntCV() {
               : "Roast without limits.";
   const paywallSub =
     paywallReason === "daily"
-      ? "Your Pass gives you 5 a day and you’ve used them. Grab a ₹5 top-up, or come back tomorrow."
+      ? isIN
+        ? "Your Pass gives you 5 a day and you’ve used them. Grab a ₹5 top-up, or come back tomorrow."
+        : "Your Pass gives you 5 roasts a day — you’ve used them. Come back tomorrow."
       : paywallReason === "watermark"
         ? "Get the 6-Month Pass to drop the watermark on every card you share."
         : isGlowup
-          ? "The roast found the flaws — the Glow-Up rewrites them into callback bullets. ₹7, or free on the 6-Month Pass."
+          ? isIN
+            ? "The roast found the flaws — the Glow-Up rewrites them into callback bullets. ₹7, or free on the 6-Month Pass."
+            : "The roast found the flaws — the Glow-Up rewrites them into callback bullets. Free on the 6-Month Pass."
           : isUnhinged
-            ? "The savage tier is ₹7 a roast — or free on the 6-Month Pass. (Mild & Medium Rare stay free for your first roast.)"
+            ? isIN
+              ? "The savage tier is ₹7 a roast — or free on the 6-Month Pass. (Mild & Medium Rare stay free for your first roast.)"
+              : "The savage tier is on the 6-Month Pass. (Mild & Medium Rare stay free for your first roast.)"
             : paywallReason === "roast"
-              ? "Your first one was on us. Keep roasting — ₹7 a pop, or ₹199 for 5 a day, 6 months."
-              : "₹7 per roast, or ₹199 for 5 roasts a day for 6 months.";
-  const showSingle = paywallReason !== "watermark";
-  const showLifetime = paywallReason !== "daily";
+              ? isIN
+                ? "Your first one was on us. Keep roasting — ₹7 a pop, or ₹199 for 5 a day, 6 months."
+                : "Your first one was on us. Get the 6-Month Pass — 5 roasts a day for 6 months."
+              : isIN
+                ? "₹7 per roast, or ₹199 for 5 roasts a day for 6 months."
+                : "The 6-Month Pass — 5 roasts a day for 6 months.";
+  // India (Razorpay) shows the micro-roast + ₹199 Pass cards; the rest of the
+  // world (Creem) sees only the $7.20 Pass — micro-payments don't survive
+  // international fees.
+  const showSingle = isIN && paywallReason !== "watermark";
+  const showLifetime = isIN && paywallReason !== "daily";
+  const showCreem = !isIN && paywallReason !== "daily";
   // Pass holders past 5/day pay a ₹5 top-up; Glow-Up and a single roast are ₹7.
   const isDaily = paywallReason === "daily";
   const payPlan: Plan = isGlowup ? "glowup" : isDaily ? "topup" : "single";
@@ -1712,6 +1778,52 @@ export default function BurntCV() {
                   >
                     {buying === "lifetime" ? "Opening checkout…" : "Get the Pass — ₹199"}
                   </button>
+                </div>
+              )}
+
+              {showCreem && (
+                <div
+                  style={css(
+                    "border:2px solid #ed3237;border-radius:20px;padding:22px;background:linear-gradient(180deg,rgba(237,50,55,.04),transparent);position:relative;",
+                  )}
+                >
+                  <div
+                    style={css(
+                      "position:absolute;top:-11px;left:22px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-size:10px;font-weight:800;letter-spacing:.08em;padding:4px 11px;border-radius:999px;",
+                    )}
+                  >
+                    BEST VALUE · 6 MONTHS
+                  </div>
+                  <div style={css("display:flex;align-items:baseline;gap:8px;margin-top:6px;")}>
+                    <span style={css("font-size:34px;font-weight:900;letter-spacing:-.02em;")}>$7.20</span>
+                    <span style={css("font-size:14px;color:#808080;font-weight:600;")}>5 a day · 6 months.</span>
+                  </div>
+                  <div style={css("font-weight:800;font-size:15px;margin:4px 0 14px;")}>BurntCV 6-Month Pass 🔥</div>
+                  <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    {PASS_PERKS.map((perk) => (
+                      <div
+                        key={perk}
+                        style={css(
+                          "display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:#222;line-height:1.4;",
+                        )}
+                      >
+                        <span style={css("color:#1f8a5b;font-weight:800;")}>✓</span>
+                        {perk}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={buyCreem}
+                    disabled={creemLoading}
+                    style={css(
+                      "width:100%;border:none;cursor:pointer;padding:16px;border-radius:14px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:16px;margin-top:18px;box-shadow:0 14px 26px -12px rgba(237,50,55,.6);",
+                    )}
+                  >
+                    {creemLoading ? "Opening checkout…" : "Get the Pass — $7.20"}
+                  </button>
+                  <div style={css("text-align:center;font-size:11px;color:#9c9c9c;margin-top:9px;")}>
+                    Secure global checkout by Creem · cards &amp; more
+                  </div>
                 </div>
               )}
 

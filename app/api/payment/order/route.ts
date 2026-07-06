@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 const PRICE_PAISE: Record<string, number> = {
   single: 700, // ₹7 — free user, past their freebie
   topup: 500, // ₹5 — lifetime user, extra roast past today's 5
-  glowup: 700, // ₹7 — the Glow-Up fix-list (free for Pass / BYOK)
+  glowup: 4900, // ₹49 — the Glow-Up rewrite (4 included with the Pass, then ₹49)
   lifetime: 19900, // ₹199
 };
 

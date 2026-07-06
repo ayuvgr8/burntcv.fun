@@ -8,10 +8,16 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function ShippingPage() {
+export default async function ShippingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Shipping & Delivery Policy"
+      embed={embed}
       intro={
         <>
           {OPERATOR.brand}, operated by {OPERATOR.legalName}, {OPERATOR_LOCATION},

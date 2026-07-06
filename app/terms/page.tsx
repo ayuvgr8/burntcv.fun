@@ -8,10 +8,16 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function TermsPage() {
+export default async function TermsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Terms & Conditions"
+      embed={embed}
       intro={
         <>
           These Terms govern your use of {OPERATOR.brand} ({OPERATOR_HOST}), a

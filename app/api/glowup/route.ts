@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
 import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
 import { budgetAvailable, recordSpend } from "@/lib/spendcap";
-import { verifyToken } from "@/lib/entitlements";
+import { verifyToken, consumePassGlowup } from "@/lib/entitlements";
 import {
   buildGlowupPrompt,
   fallbackGlowup,
@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let body: { text?: string; passToken?: string };
+  let body: { text?: string; passToken?: string; paid?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -32,10 +32,26 @@ export async function POST(req: Request) {
   if (!(await budgetAvailable())) {
     return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
   }
-  // A valid Pass token bypasses the per-IP limit (Glow-Up is included with the
-  // Pass); everyone else is IP-limited so the ₹7 gate can't be bypassed by
-  // calling the route directly.
-  if (!verifyToken(body.passToken)) {
+
+  // Gate the Glow-Up. The Pass includes GLOWUPS_PER_PASS free rewrites, then
+  // ₹49 each like everyone else:
+  //  - Valid Pass, not a paid top-up → consume one of the Pass's credits. When
+  //    they run out we return 402 so the client charges ₹49 and retries with
+  //    `paid:true`.
+  //  - Everyone else (no Pass, or a ₹49 top-up the client just paid for) →
+  //    per-IP limited so the paywall can't be bypassed by calling the route.
+  const pass = verifyToken(body.passToken);
+  let glowupsLeft: number | undefined;
+  if (pass && !body.paid) {
+    const remaining = await consumePassGlowup(pass.code);
+    if (remaining < 0) {
+      return NextResponse.json(
+        { error: "glowups_exhausted", glowupsLeft: 0 },
+        { status: 402 },
+      );
+    }
+    glowupsLeft = remaining;
+  } else {
     const { allowed } = await checkAndIncrement(ipFrom(req));
     if (!allowed) {
       return NextResponse.json({ error: "rate_limited" }, { status: 429 });
@@ -58,5 +74,5 @@ export async function POST(req: Request) {
   }
 
   if (!glowup || !Array.isArray(glowup.rewrites)) glowup = fallbackGlowup();
-  return NextResponse.json({ glowup });
+  return NextResponse.json({ glowup, glowupsLeft });
 }

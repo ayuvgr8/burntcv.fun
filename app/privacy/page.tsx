@@ -8,10 +8,16 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function PrivacyPage() {
+export default async function PrivacyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Privacy Policy"
+      embed={embed}
       intro={
         <>
           {OPERATOR.brand} is operated by {OPERATOR.legalName}, {OPERATOR_LOCATION}.

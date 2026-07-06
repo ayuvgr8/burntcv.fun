@@ -11,7 +11,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getRedis, hasRedis } from "./redis";
-import { PASS_MS } from "./plan";
+import { PASS_MS, GLOWUPS_PER_PASS } from "./plan";
 
 const SECRET =
   process.env.ENTITLEMENT_SECRET || process.env.RAZORPAY_KEY_SECRET || "";
@@ -45,6 +45,40 @@ async function kvGet(key: string): Promise<string | null> {
     return null;
   }
   return e.v;
+}
+
+// ---- Pass Glow-Up quota ----
+// Each Pass includes GLOWUPS_PER_PASS free Glow-Ups. We track how many have
+// been used with a counter keyed by the Pass code, so the quota can't be reset
+// by clearing the browser (the signed token proves which Pass is asking).
+const glowKey = (code: string) => `ent:glowused:${code}`;
+
+export async function passGlowupsLeft(code: string): Promise<number> {
+  const raw = await kvGet(glowKey(code));
+  const used = raw ? parseInt(raw, 10) || 0 : 0;
+  return Math.max(0, GLOWUPS_PER_PASS - used);
+}
+
+// Atomically consume one Pass Glow-Up credit. Returns the number remaining
+// AFTER this consume, or -1 if the Pass is already exhausted (caller should
+// then charge ₹49 instead). Reverts the increment on overshoot so a burst of
+// requests can't inflate the counter past the cap.
+export async function consumePassGlowup(code: string): Promise<number> {
+  const key = glowKey(code);
+  let used: number;
+  if (redis) {
+    used = await redis.incr(key);
+    if (used === 1) await redis.expire(key, TTL_SECONDS);
+    if (used > GLOWUPS_PER_PASS) {
+      await redis.decr(key);
+      return -1;
+    }
+  } else {
+    used = Number((await kvGet(key)) || 0) + 1;
+    if (used > GLOWUPS_PER_PASS) return -1;
+    await kvSet(key, String(used));
+  }
+  return GLOWUPS_PER_PASS - used;
 }
 
 // ---- signed token ----
@@ -107,21 +141,32 @@ async function saveRecord(rec: PassRecord): Promise<void> {
   await kvSet(`ent:order:${rec.orderId}`, rec.code);
 }
 
+export interface PassResult {
+  code: string;
+  passUntil: number;
+  token: string;
+  glowupsLeft: number;
+}
+
+async function buildPassResult(rec: PassRecord): Promise<PassResult> {
+  return {
+    code: rec.code,
+    passUntil: rec.passUntil,
+    token: signToken({ t: "pass", passUntil: rec.passUntil, email: rec.email, code: rec.code }),
+    glowupsLeft: await passGlowupsLeft(rec.code),
+  };
+}
+
 // Idempotent per Razorpay order — safe to call from both verify and webhook.
 export async function ensurePassForOrder(args: {
   orderId: string;
   email: string;
-}): Promise<{ code: string; passUntil: number; token: string }> {
+}): Promise<PassResult> {
   const existingCode = await kvGet(`ent:order:${args.orderId}`);
   if (existingCode) {
     const raw = await kvGet(`ent:code:${existingCode}`);
     if (raw) {
-      const rec = JSON.parse(raw) as PassRecord;
-      return {
-        code: rec.code,
-        passUntil: rec.passUntil,
-        token: signToken({ t: "pass", passUntil: rec.passUntil, email: rec.email, code: rec.code }),
-      };
+      return buildPassResult(JSON.parse(raw) as PassRecord);
     }
   }
   const rec: PassRecord = {
@@ -133,18 +178,14 @@ export async function ensurePassForOrder(args: {
     createdAt: Date.now(),
   };
   await saveRecord(rec);
-  return {
-    code: rec.code,
-    passUntil: rec.passUntil,
-    token: signToken({ t: "pass", passUntil: rec.passUntil, email: rec.email, code: rec.code }),
-  };
+  return buildPassResult(rec);
 }
 
 // Restore by code or email → returns a fresh token for this device.
 export async function restorePass(args: {
   code?: string;
   email?: string;
-}): Promise<{ code: string; passUntil: number; token: string } | null> {
+}): Promise<PassResult | null> {
   let code = args.code?.trim().toUpperCase();
   if (!code && args.email) {
     code = (await kvGet(`ent:email:${args.email.trim().toLowerCase()}`)) ?? undefined;
@@ -154,9 +195,5 @@ export async function restorePass(args: {
   if (!raw) return null;
   const rec = JSON.parse(raw) as PassRecord;
   if (rec.passUntil < Date.now()) return null; // expired
-  return {
-    code: rec.code,
-    passUntil: rec.passUntil,
-    token: signToken({ t: "pass", passUntil: rec.passUntil, email: rec.email, code: rec.code }),
-  };
+  return buildPassResult(rec);
 }

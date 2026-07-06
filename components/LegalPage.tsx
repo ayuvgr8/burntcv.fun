@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { css } from "./css";
+import Footer from "./Footer";
 import { OPERATOR, POLICY_UPDATED } from "@/lib/operator";
 
 // Shared shell for the policy pages (Terms, Privacy, Refund, Shipping,
@@ -32,38 +33,51 @@ export default function LegalPage({
   title,
   intro,
   children,
+  embed = false,
 }: {
   title: string;
   intro?: ReactNode;
   children: ReactNode;
+  // `embed` renders the doc for the footer pop-up (inside an iframe): the site
+  // header and footer are dropped and the background goes transparent so it
+  // sits cleanly inside the modal card.
+  embed?: boolean;
 }) {
   return (
     <div
       style={css(
-        "min-height:100vh;background:radial-gradient(120% 60% at 85% -10%,rgba(234,76,137,.06),transparent 55%),#f7f6f4;display:flex;flex-direction:column;",
+        embed
+          ? "background:transparent;display:flex;flex-direction:column;"
+          : "min-height:100vh;background:radial-gradient(120% 60% at 85% -10%,rgba(234,76,137,.06),transparent 55%),#f7f6f4;display:flex;flex-direction:column;",
       )}
     >
-      <header
-        style={css(
-          "max-width:820px;width:100%;margin:0 auto;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;",
-        )}
-      >
-        <Link href="/" style={css("display:flex;align-items:center;gap:9px;")}>
-          <span style={css("font-size:20px;")}>🔥</span>
-          <span style={css("font-weight:900;font-size:18px;letter-spacing:-.02em;")}>
-            {OPERATOR.brand}
-          </span>
-        </Link>
-        <Link
-          href="/"
-          style={css("font-size:13.5px;font-weight:700;color:#4e3188;")}
+      {!embed && (
+        <header
+          style={css(
+            "max-width:820px;width:100%;margin:0 auto;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;",
+          )}
         >
-          ← Back to roasting
-        </Link>
-      </header>
+          <Link href="/" style={css("display:flex;align-items:center;gap:9px;")}>
+            <span style={css("font-size:20px;")}>🔥</span>
+            <span style={css("font-weight:900;font-size:18px;letter-spacing:-.02em;")}>
+              {OPERATOR.brand}
+            </span>
+          </Link>
+          <Link
+            href="/"
+            style={css("font-size:13.5px;font-weight:700;color:#4e3188;")}
+          >
+            ← Back to roasting
+          </Link>
+        </header>
+      )}
 
       <main
-        style={css("max-width:820px;width:100%;margin:0 auto;padding:20px 26px 10px;flex:1 0 auto;")}
+        style={css(
+          embed
+            ? "max-width:820px;width:100%;margin:0 auto;padding:16px 22px 34px;flex:1 0 auto;"
+            : "max-width:820px;width:100%;margin:0 auto;padding:20px 26px 10px;flex:1 0 auto;",
+        )}
       >
         <h1
           style={css(
@@ -86,6 +100,8 @@ export default function LegalPage({
         )}
         {children}
       </main>
+
+      {!embed && <Footer />}
     </div>
   );
 }

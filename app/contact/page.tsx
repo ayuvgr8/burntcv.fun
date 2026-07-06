@@ -8,10 +8,16 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Contact Us"
+      embed={embed}
       intro={
         <>
           Questions, payment issues, or feedback on your roast? {OPERATOR.legalName}

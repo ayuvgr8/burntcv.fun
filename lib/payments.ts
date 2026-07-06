@@ -13,14 +13,15 @@ export type Plan = "single" | "topup" | "glowup" | "lifetime";
 export const PRICES: Record<Plan, { rupees: number; label: string }> = {
   single: { rupees: 7, label: "One roast" }, // free user, past their freebie
   topup: { rupees: 5, label: "Extra roast" }, // lifetime user, past today's 5
-  glowup: { rupees: 7, label: "The Glow-Up fix-list" }, // free/single user
-  lifetime: { rupees: 199, label: "6-Month Pass · 5/day" },
+  glowup: { rupees: 49, label: "The Glow-Up rewrite" }, // 4 free on the Pass, then ₹49
+  lifetime: { rupees: 199, label: "6-Month Pass · 5/day + 4 Glow-Ups" },
 };
 
 export interface PassEntitlement {
   code: string;
   passUntil: number;
   token: string;
+  glowupsLeft?: number; // Glow-Up rewrites remaining on this Pass
 }
 
 export interface PurchaseResult {
@@ -137,6 +138,52 @@ export async function restoreEntitlement(input: {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.pass as PassEntitlement) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── International (Creem) — the $7.20 Pass for the rest of the world ──────────
+
+// Which payment rail to show: India → Razorpay, everyone else → Creem.
+// Fails open to international (Creem) so foreigners never get UPI-only.
+export async function fetchRegion(): Promise<"IN" | "INTL"> {
+  try {
+    const res = await fetch("/api/geo");
+    const data = await res.json();
+    return data?.india ? "IN" : "INTL";
+  } catch {
+    return "INTL";
+  }
+}
+
+// Start the Creem hosted checkout for the international Pass → redirects the
+// browser to Creem. On success Creem returns to /?creem=success&checkout_id=…
+export async function startCreemCheckout(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/creem/checkout", { method: "POST" });
+    const data = await res.json();
+    if (data?.url) {
+      window.location.href = data.url;
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// On return from Creem, confirm payment server-side and get the minted Pass.
+export async function claimCreem(checkoutId: string): Promise<PassEntitlement | null> {
+  try {
+    const res = await fetch("/api/creem/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ checkoutId }),
     });
     if (!res.ok) return null;
     const data = await res.json();

@@ -8,10 +8,16 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-export default function RefundPage() {
+export default async function RefundPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const embed = (await searchParams).embed === "1";
   return (
     <LegalPage
       title="Cancellation & Refund Policy"
+      embed={embed}
       intro={
         <>
           This policy covers purchases made on {OPERATOR.brand}, operated by{" "}

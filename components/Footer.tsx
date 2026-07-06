@@ -3,28 +3,25 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { css } from "./css";
-import { LEGAL } from "@/lib/legal";
+import { OPERATOR, OPERATOR_LOCATION } from "@/lib/operator";
 
-// Rendered globally from app/layout.tsx so every route — landing, /linkedin,
-// and all four policy pages — carries these links in the footer. Payment
-// aggregators (Razorpay) require Terms, Privacy, Refund/Cancellation and
-// Contact to be reachable from every page before they activate your account.
-//
-// Clicking a link opens the policy in a scrollable pop-up (an iframe of the
-// real page in ?embed=1 mode — single source of truth, no duplicated copy),
-// with an "Open full page" escape hatch. The links keep their real hrefs, so
-// SEO, right-click, and ⌘/Ctrl-click still open the standalone page.
-
-const LINKS = [
+const LINKS: { href: string; label: string }[] = [
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
-  { href: "/refund", label: "Refund & Cancellation" },
+  { href: "/refund", label: "Refunds" },
+  { href: "/shipping", label: "Delivery" },
   { href: "/contact", label: "Contact" },
 ];
 
 type Doc = { href: string; label: string };
 
-export default function SiteFooter() {
+// Site-wide footer. Carries the operator identity + policy links Razorpay
+// looks for during merchant activation. Clicking a policy link opens it in a
+// scrollable pop-up (an iframe of the real page in ?embed=1 mode — single
+// source of truth, no duplicated copy) with an "Open full page" escape hatch.
+// Links keep their real hrefs, so SEO, right-click, and ⌘/Ctrl-click still open
+// the standalone page.
+export default function Footer() {
   const [open, setOpen] = useState<Doc | null>(null);
   // Hide the footer when this page is itself rendered inside the pop-up iframe,
   // so the embedded policy doesn't carry a second footer (or a nested modal).
@@ -68,46 +65,57 @@ export default function SiteFooter() {
     <>
       <footer
         style={css(
-          "border-top:1.5px solid rgba(15,6,35,.1);padding:26px 20px;background:#e9e7ec;",
+          "border-top:1px solid rgba(15,6,35,.08);margin-top:40px;background:transparent;",
         )}
       >
         <div
           style={css(
-            "max-width:900px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 20px;",
+            "max-width:1140px;margin:0 auto;padding:34px 26px 44px;display:flex;flex-wrap:wrap;gap:24px 40px;align-items:flex-start;justify-content:space-between;",
           )}
         >
-          <span
+          <div style={css("display:flex;flex-direction:column;gap:6px;max-width:420px;")}>
+            <div style={css("display:flex;align-items:center;gap:8px;")}>
+              <span style={css("font-size:17px;")}>🔥</span>
+              <span style={css("font-weight:900;font-size:16px;letter-spacing:-.02em;")}>
+                {OPERATOR.brand}
+              </span>
+            </div>
+            <div style={css("font-size:12.5px;line-height:1.55;color:#9c9c9c;")}>
+              {OPERATOR.brand} is operated by{" "}
+              <span style={css("color:#5a5a5a;font-weight:600;")}>{OPERATOR.legalName}</span>
+              , {OPERATOR_LOCATION}.
+            </div>
+            <a
+              href={`mailto:${OPERATOR.email}`}
+              style={css("font-size:12.5px;color:#4e3188;font-weight:600;")}
+            >
+              {OPERATOR.email}
+            </a>
+          </div>
+
+          <nav
             style={css(
-              "display:inline-flex;align-items:center;gap:7px;font-weight:900;font-size:15px;color:#0f0623;",
+              "display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;font-weight:600;color:#5a5a5a;",
             )}
           >
-            <span aria-hidden>🔥</span> BurntCV
-          </span>
-
-          <nav style={css("display:flex;flex-wrap:wrap;gap:8px 18px;")}>
             {LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={(e) => onLinkClick(e, l)}
-                style={css(
-                  "font-size:13px;font-weight:600;color:#4e3188;cursor:pointer;",
-                )}
+                style={css("color:#5a5a5a;cursor:pointer;")}
               >
                 {l.label}
               </Link>
             ))}
           </nav>
-
-          <span
-            style={css(
-              "flex-basis:100%;font-size:12px;color:#8a8693;line-height:1.6;",
-            )}
-          >
-            © {new Date().getFullYear()} {LEGAL.entityName} · BurntCV is a satire /
-            entertainment product. Roasts are AI-generated comedy — not
-            professional, career, legal, or financial advice.
-          </span>
+        </div>
+        <div
+          style={css(
+            "max-width:1140px;margin:0 auto;padding:0 26px 30px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.06em;color:#b5b5b5;",
+          )}
+        >
+          © 2026 {OPERATOR.legalName}. All rights reserved.
         </div>
       </footer>
 
