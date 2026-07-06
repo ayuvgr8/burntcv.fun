@@ -98,7 +98,7 @@ export default function BurntCV() {
     "roast" | "daily" | "watermark" | "glowup" | "unhinged" | "upsell" | null
   >(null);
 
-  // Payment region: India → Razorpay/UPI, everyone else → Creem ($7.20 Pass).
+  // Payment region: India → Razorpay/UPI, everyone else → Creem ($9.99 Pass + $4.99 Glow-Up).
   const [region, setRegion] = useState<"IN" | "INTL">("IN");
 
   const stack = useRef<Screen[]>([]);
@@ -703,7 +703,7 @@ export default function BurntCV() {
         : isGlowup
           ? isIN
             ? "The roast found the flaws — the Glow-Up rewrites them into callback bullets. ₹49, or 4 included with the 6-Month Pass."
-            : "The roast found the flaws — the Glow-Up rewrites them into callback bullets. Free on the 6-Month Pass."
+            : "The roast found the flaws — the Glow-Up rewrites them into callback bullets. $4.99, or included in the 6-Month Pass."
           : isUnhinged
             ? isIN
               ? "The savage tier is ₹7 a roast — or free on the 6-Month Pass. (Mild & Medium Rare stay free for your first roast.)"
@@ -742,7 +742,7 @@ export default function BurntCV() {
     return (
       <>
         {toast && <Toast toast={toast} />}
-        <Landing onRoast={() => go("input")} onLinkedIn={goLinkedIn} />
+        <Landing onRoast={() => go("input")} onLinkedIn={goLinkedIn} region={region} />
       </>
     );
   }
@@ -2054,7 +2054,7 @@ export default function BurntCV() {
                       5 roasts/day · {GLOWUPS_PER_PASS} Glow-Ups · no watermark · 6 months
                     </div>
                   </div>
-                  <span style={css("position:relative;font-weight:800;font-size:15px;")}>{isIN ? "₹199" : "$7.20"} →</span>
+                  <span style={css("position:relative;font-weight:800;font-size:15px;")}>{isIN ? "₹199" : "$9.99"} →</span>
                 </div>
               )}
               {hasPass && (
@@ -2207,7 +2207,7 @@ export default function BurntCV() {
               <MenuItem onClick={() => go("input")} label="🔥 New roast" />
               <MenuItem onClick={() => go("history")} label="🗒️ Roast history" />
               <MenuItem onClick={() => go("settings")} label="⚙️ Settings & API key" />
-              <MenuItem onClick={goPaywall} label={`⚡ Get the 6-Month Pass · ${isIN ? "₹199" : "$7.20"}`} color="#ed3237" />
+              <MenuItem onClick={goPaywall} label={`⚡ Get the 6-Month Pass · ${isIN ? "₹199" : "$9.99"}`} color="#ed3237" />
               <MenuItem onClick={goHome} label="← Back to home" color="#808080" />
             </div>
           </>

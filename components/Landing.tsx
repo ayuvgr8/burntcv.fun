@@ -119,11 +119,28 @@ const INT_ACCENT: Record<string, string> = {
 export default function Landing({
   onRoast,
   onLinkedIn,
+  region,
 }: {
   onRoast: () => void;
   onLinkedIn: () => void;
+  region: "IN" | "INTL";
 }) {
   const [level, setLevel] = useState("medium");
+
+  // India keeps the "less than a samosa" line; everyone else gets a universal
+  // "less than a coffee" so the landing doesn't read India-only to foreigners.
+  // Both SSR and first paint use region="IN" (the default), so no hydration flip.
+  const faq =
+    region === "IN"
+      ? FAQ
+      : FAQ.map((f) =>
+          f.q.startsWith("Is it free")
+            ? {
+                ...f,
+                a: "Your first roast is free. Deeper roasts and the Glow-Up rewrite cost less than a coffee.",
+              }
+            : f,
+        );
   // Start deterministic (index 0) to match SSR, then randomise after mount so
   // the persona tagline changes on every reload without a hydration mismatch.
   const [taglineIdx, setTaglineIdx] = useState(0);
@@ -805,7 +822,7 @@ export default function Landing({
           Questions you&apos;re too proud to ask.
         </h2>
         <div style={css("display:flex;flex-direction:column;gap:12px;")}>
-          {FAQ.map((f, i) => (
+          {faq.map((f, i) => (
             <details
               key={i}
               style={css(

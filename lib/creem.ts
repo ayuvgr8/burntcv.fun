@@ -1,27 +1,31 @@
 // Creem (Merchant of Record) — international USD checkout. India keeps
 // Razorpay/UPI; the rest of the world buys through Creem, which handles global
-// cards + sales tax/VAT. Two products are sold internationally:
-//   • the 6-Month Pass ($9.99, one-time)  → mints the same entitlement a
-//     Razorpay Pass does (see ensurePassForOrder), so nothing downstream cares
-//     which gateway paid.
-//   • the Glow-Up ($4.99, one-time)        → a one-off unlock, no entitlement;
-//     the client just runs the Glow-Up once payment is confirmed.
+// cards + sales tax/VAT. Three one-time products are sold internationally:
+//   • the 6-Month Pass ($9.99)   → mints the same entitlement a Razorpay Pass
+//     does (see ensurePassForOrder), so nothing downstream cares which gateway
+//     paid. Intl passes are metered client-side at 400 roasts / 6 months.
+//   • the Glow-Up ($4.99)        → a one-off unlock for a non-Pass user; no
+//     entitlement — the client just runs the Glow-Up once payment is confirmed.
+//   • the Glow-Up top-up ($3.99) → the cheaper price a Pass holder pays for a
+//     5th+ Glow-Up once their 4 included ones are used. Also a one-off.
 //
 // SECURITY: which product a checkout paid for is ALWAYS derived server-side from
-// the checkout's product id (never from a client-sent hint), so a $4.99 Glow-Up
-// can't be redeemed as a $9.99 Pass.
+// the checkout's product id (never from a client-sent hint), so a $4.99/$3.99
+// Glow-Up can't be redeemed as a $9.99 Pass.
 //
 // Env:
-//   CREEM_API_KEY            (creem_test_… → test API; creem_live_… → production)
-//   CREEM_PRODUCT_ID         the "$9.99 6-Month Pass" product
-//   CREEM_GLOWUP_PRODUCT_ID  the "$4.99 Glow-Up" product
-//   CREEM_WEBHOOK_SECRET     signs the checkout.completed webhook
+//   CREEM_API_KEY                 (creem_test_… → test API; creem_live_… → prod)
+//   CREEM_PRODUCT_ID              the "$9.99 6-Month Pass" product
+//   CREEM_GLOWUP_PRODUCT_ID       the "$4.99 Glow-Up" product
+//   CREEM_GLOWUP_TOPUP_PRODUCT_ID the "$3.99 Glow-Up top-up" product
+//   CREEM_WEBHOOK_SECRET          signs the checkout.completed webhook
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const API_KEY = process.env.CREEM_API_KEY || "";
 const PASS_PRODUCT_ID = process.env.CREEM_PRODUCT_ID || "";
 const GLOWUP_PRODUCT_ID = process.env.CREEM_GLOWUP_PRODUCT_ID || "";
+const GLOWUP_TOPUP_PRODUCT_ID = process.env.CREEM_GLOWUP_TOPUP_PRODUCT_ID || "";
 const WEBHOOK_SECRET = process.env.CREEM_WEBHOOK_SECRET || "";
 
 // Test and live are fully isolated environments with separate base URLs.
@@ -29,10 +33,12 @@ const BASE = API_KEY.startsWith("creem_test_")
   ? "https://test-api.creem.io/v1"
   : "https://api.creem.io/v1";
 
-export type CreemKind = "pass" | "glowup";
+export type CreemKind = "pass" | "glowup" | "glowup_topup";
 
 function productFor(kind: CreemKind): string {
-  return kind === "glowup" ? GLOWUP_PRODUCT_ID : PASS_PRODUCT_ID;
+  if (kind === "glowup") return GLOWUP_PRODUCT_ID;
+  if (kind === "glowup_topup") return GLOWUP_TOPUP_PRODUCT_ID;
+  return PASS_PRODUCT_ID;
 }
 
 // Is a given checkout purchasable? (Pass needs its product; Glow-Up needs its.)
@@ -125,12 +131,13 @@ export function verifyCreemWebhook(
 export function kindOf(o: Record<string, unknown> | null | undefined): CreemKind | null {
   if (!o) return null;
   const pid = extractProductId(o);
+  if (pid && GLOWUP_TOPUP_PRODUCT_ID && pid === GLOWUP_TOPUP_PRODUCT_ID) return "glowup_topup";
   if (pid && GLOWUP_PRODUCT_ID && pid === GLOWUP_PRODUCT_ID) return "glowup";
   if (pid && PASS_PRODUCT_ID && pid === PASS_PRODUCT_ID) return "pass";
   // No product-id match (e.g. field shape differs) → trust the metadata echo.
   const meta = (o as { metadata?: { kind?: unknown } }).metadata;
   const mk = meta?.kind;
-  if (mk === "glowup" || mk === "pass") return mk;
+  if (mk === "glowup" || mk === "glowup_topup" || mk === "pass") return mk;
   return null;
 }
 

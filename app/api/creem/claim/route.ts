@@ -6,9 +6,11 @@ export const runtime = "nodejs";
 
 // On return from Creem, confirm the checkout is paid (server-side, via the API
 // key) and act on the SERVER-verified product — never a client-sent hint:
-//   • pass   → mint the same 6-Month Pass entitlement a Razorpay purchase would
-//              (idempotent per checkout id; the webhook is the reliability net).
-//   • glowup → nothing to mint; tell the client to run the one-off Glow-Up.
+//   • pass                    → mint the same 6-Month Pass entitlement a Razorpay
+//                               purchase would (idempotent per checkout id; the
+//                               webhook is the reliability net).
+//   • glowup / glowup_topup   → nothing to mint; tell the client to run the
+//                               one-off Glow-Up.
 export async function POST(req: Request) {
   let checkoutId = "";
   try {
