@@ -255,12 +255,14 @@ export default function BurntCV() {
     screenRef.current = screen;
   }, [screen]);
 
-  // Reset the scroll container to the top on every screen change so a new screen
-  // (esp. the paywall) always opens at its top — otherwise it inherits the prior
-  // screen's scroll position and the pay button can land above the fold, forcing
-  // the user to scroll up to find it.
+  // Reset scroll to the top on every screen change so a new screen (esp. the
+  // paywall) always opens at its top — otherwise it inherits the prior screen's
+  // scroll position and the pay button can land above the fold, forcing the user
+  // to scroll up to find it. The frame is `min-height:100vh`, so the page scrolls
+  // at the WINDOW level; the inner container is reset too for safety.
   const scrollRef = useRef<HTMLDivElement>(null);
   useIsoLayoutEffect(() => {
+    window.scrollTo(0, 0);
     scrollRef.current?.scrollTo(0, 0);
   }, [screen]);
 
