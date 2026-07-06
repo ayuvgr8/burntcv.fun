@@ -11,7 +11,17 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getRedis, hasRedis } from "./redis";
-import { PASS_MS, GLOWUPS_PER_PASS } from "./plan";
+import {
+  PASS_MS,
+  GLOWUPS_PER_PASS,
+  ROASTS_PER_DAY,
+  INTL_PASS_ROAST_CAP,
+} from "./plan";
+
+// A Pass is sold on one of two rails, which decide its roast allowance:
+//   • "IN"   (Razorpay) → 5 roasts/day for 6 months.
+//   • "INTL" (Creem)    → 400 roasts total across the 6 months.
+export type PassRegion = "IN" | "INTL";
 
 const SECRET =
   process.env.ENTITLEMENT_SECRET || process.env.RAZORPAY_KEY_SECRET || "";
@@ -82,10 +92,13 @@ export async function consumePassGlowup(code: string): Promise<number> {
 }
 
 // ---- signed token ----
+// NOTE: the token is HMAC-signed (tamper-proof) but NOT encrypted — the body is
+// readable base64. So it carries only non-sensitive claims: the Pass code and
+// expiry. The buyer's email is never embedded (it lives only in Redis, indexed
+// for restore). Verification needs nothing more than code + passUntil.
 export interface PassClaims {
   t: "pass";
   passUntil: number;
-  email: string;
   code: string;
 }
 
@@ -152,7 +165,7 @@ async function buildPassResult(rec: PassRecord): Promise<PassResult> {
   return {
     code: rec.code,
     passUntil: rec.passUntil,
-    token: signToken({ t: "pass", passUntil: rec.passUntil, email: rec.email, code: rec.code }),
+    token: signToken({ t: "pass", passUntil: rec.passUntil, code: rec.code }),
     glowupsLeft: await passGlowupsLeft(rec.code),
   };
 }
@@ -181,15 +194,16 @@ export async function ensurePassForOrder(args: {
   return buildPassResult(rec);
 }
 
-// Restore by code or email → returns a fresh token for this device.
+// Restore by the SECRET restore code only. Email-only restore is intentionally
+// disabled: emails aren't secret, so returning a token to whoever types an email
+// is Pass theft. The `email` arg is accepted for API compatibility but ignored;
+// email alone can't restore. (The email→code index is still written on purchase
+// for a future magic-link flow, where recovery goes TO the mailbox owner.)
 export async function restorePass(args: {
   code?: string;
   email?: string;
 }): Promise<PassResult | null> {
-  let code = args.code?.trim().toUpperCase();
-  if (!code && args.email) {
-    code = (await kvGet(`ent:email:${args.email.trim().toLowerCase()}`)) ?? undefined;
-  }
+  const code = args.code?.trim().toUpperCase();
   if (!code) return null;
   const raw = await kvGet(`ent:code:${code}`);
   if (!raw) return null;

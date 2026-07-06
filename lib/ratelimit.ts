@@ -23,6 +23,19 @@ const upstashLimiter = redis
     })
   : null;
 
+// Separate, tighter limiter for the Pass-restore endpoint so it can't be used
+// to fish for other people's Passes (esp. email restore, where the keyspace is
+// small). Per-IP, and kept off the roast limiter so it never eats roast quota.
+const RESTORE_PER_HOUR = Number(process.env.RESTORE_PER_HOUR ?? 20);
+const restoreLimiter = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.fixedWindow(RESTORE_PER_HOUR, "1 h"),
+      prefix: "burntcv:restore",
+      analytics: false,
+    })
+  : null;
+
 // ---- in-memory fallback (per warm instance only) ----
 type Entry = { day: string; count: number };
 const memHits = new Map<string, Entry>();
@@ -60,6 +73,33 @@ export async function checkAndIncrement(
     }
   }
   return memCheck(ip);
+}
+
+// ---- restore endpoint limiter ----
+type Hourly = { hour: number; count: number };
+const memRestore = new Map<string, Hourly>();
+
+function memRestoreCheck(ip: string): boolean {
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const e = memRestore.get(ip);
+  const count = e && e.hour === hour ? e.count : 0;
+  if (count >= RESTORE_PER_HOUR) return false;
+  memRestore.set(ip, { hour, count: count + 1 });
+  return true;
+}
+
+// Returns false when this IP has exceeded the restore attempt budget this hour.
+export async function checkRestore(ip: string): Promise<boolean> {
+  if (restoreLimiter) {
+    try {
+      const { success } = await restoreLimiter.limit(ip);
+      return success;
+    } catch (err) {
+      console.error("[ratelimit] restore upstash error, falling back:", err);
+      return memRestoreCheck(ip);
+    }
+  }
+  return memRestoreCheck(ip);
 }
 
 export const usingDurableRateLimit = !!upstashLimiter;

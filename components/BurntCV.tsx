@@ -26,6 +26,10 @@ import {
   type Roast,
 } from "@/lib/roast";
 
+// International Pass allowance: 400 roasts across the 6 months (no daily cap),
+// after which the holder buys a new Pass. India stays on the 5-roasts/day model.
+const INTL_ROAST_CAP = 400;
+
 // How a roast is paid for, resolved before the API call and used for accounting.
 type Consume = "byok" | "lifetime" | "free" | "paid";
 
@@ -51,9 +55,36 @@ const LOADING_MSGS = [
 const PASS_PERKS = [
   "5 roasts a day for 6 months",
   "All 6 roaster personas + Unhinged 💀",
-  `${GLOWUPS_PER_PASS} Glow-Up rewrites included (₹49 each)`,
+  `${GLOWUPS_PER_PASS} Glow-Up rewrites included (₹49 each after)`,
   "Watermark-free share cards",
 ];
+// International Pass is a 400-roast bucket over 6 months, with $3.99 extra Glow-Ups.
+const PASS_PERKS_INTL = [
+  "400 roasts over 6 months",
+  "All 6 roaster personas + Unhinged 💀",
+  `${GLOWUPS_PER_PASS} Glow-Up rewrites included ($3.99 each after)`,
+  "Watermark-free share cards",
+];
+
+// Shared mono section-label + placeholder-highlight styles for the Glow-Up.
+const GLOW_LABEL =
+  "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.14em;font-weight:700;color:#0f0623;";
+const PH_STYLE =
+  "background:#ffe8a3;color:#7a5a00;font-weight:700;padding:0 4px;border-radius:4px;white-space:nowrap;";
+
+// Highlight [bracketed] fill-in-the-blank placeholders so they're impossible to
+// miss (and never mistaken for a real, defensible number).
+function hlPlaceholders(text: string) {
+  return text.split(/(\[[^\]]+\])/g).map((part, i) =>
+    /^\[[^\]]+\]$/.test(part) ? (
+      <mark key={i} style={css(PH_STYLE)}>
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
 
 // Rotating tile palettes for the buzzword-autopsy bento grid (collage feel).
 const BENTO_PALETTES = [
@@ -88,6 +119,7 @@ export default function BurntCV() {
   const [apiKey, setApiKey] = useState("");
   const [keyDraft, setKeyDraft] = useState("");
   const [roastsToday, setRoastsToday] = useState(0);
+  const [passRoasts, setPassRoasts] = useState(0); // lifetime — intl 400-cap
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
@@ -95,7 +127,7 @@ export default function BurntCV() {
   const [restoreInput, setRestoreInput] = useState("");
   const [restoring, setRestoring] = useState(false);
   const [paywallReason, setPaywallReason] = useState<
-    "roast" | "daily" | "watermark" | "glowup" | "unhinged" | "upsell" | null
+    "roast" | "daily" | "passcap" | "watermark" | "glowup" | "unhinged" | "upsell" | null
   >(null);
 
   // Payment region: India → Razorpay/UPI, everyone else → Creem ($9.99 Pass + $4.99 Glow-Up).
@@ -107,6 +139,12 @@ export default function BurntCV() {
 
   const byok = !!apiKey;
   const hasPass = passUntil > Date.now();
+  // India Pass = 5 roasts/day; international Pass = 400 roasts over the 6 months,
+  // no daily limit (metered client-side, like the daily counter).
+  const isIN = region === "IN";
+  const passRoastsLeft = isIN
+    ? Math.max(0, 5 - roastsToday)
+    : Math.max(0, INTL_ROAST_CAP - passRoasts);
 
   useEffect(() => {
     const u = load();
@@ -118,6 +156,7 @@ export default function BurntCV() {
     setApiKey(u.apiKey);
     setKeyDraft(u.apiKey);
     setRoastsToday(u.roastsToday);
+    setPassRoasts(u.passRoasts);
     setHistory(u.history);
 
     // Which payment rail to show (India → Razorpay, else → Creem).
@@ -135,15 +174,20 @@ export default function BurntCV() {
     }
 
     // Return from a Creem checkout → confirm payment server-side, then act on
-    // the server-verified product: "glowup" runs the one-off Glow-Up, "pass"
-    // applies the 6-Month Pass entitlement.
+    // the server-verified product: a standalone "glowup" runs the one-off
+    // Glow-Up; "glowup_topup" is a Pass holder's 5th+ Glow-Up (paid, so the
+    // server won't spend a Pass credit); "pass" applies the 6-Month Pass.
     if (params.get("creem") === "success") {
       const cid = params.get("checkout_id");
       window.history.replaceState(null, "", "/");
       if (cid) {
         claimCreem(cid).then((res) => {
           if (res.ok && res.kind === "glowup") {
-            execGlowup();
+            execGlowup(false);
+            return;
+          }
+          if (res.ok && res.kind === "glowup_topup") {
+            execGlowup(true);
             return;
           }
           const pass = res.pass;
@@ -153,11 +197,13 @@ export default function BurntCV() {
             setPassToken(pass.token);
             setPassCode(pass.code);
             setGlowupsLeft(gl);
+            setPassRoasts(0); // fresh Pass → reset the 400-roast lifetime counter
             persist({
               passUntil: pass.passUntil,
               passToken: pass.token,
               passCode: pass.code,
               glowupsLeft: gl,
+              passRoasts: 0,
             });
             toastMsg("6-Month Pass unlocked 🔥 — restore code saved in Settings");
           } else {
@@ -310,9 +356,12 @@ export default function BurntCV() {
     // are metered. 'byok' and 'paid' need no accounting.
     const patch: Record<string, unknown> = { history: nextHistory };
     if (consume === "lifetime") {
-      const inc = roastsToday + 1;
+      const inc = roastsToday + 1; // daily (India 5/day)
+      const life = passRoasts + 1; // lifetime (international 400-cap)
       setRoastsToday(inc);
+      setPassRoasts(life);
       patch.roastsToday = inc;
+      patch.passRoasts = life;
     } else if (consume === "free") {
       setFreeRoastUsed(true);
       patch.freeRoastUsed = true;
@@ -329,6 +378,7 @@ export default function BurntCV() {
     apiKey,
     passToken,
     roastsToday,
+    passRoasts,
     history,
     toastMsg,
   ]);
@@ -341,10 +391,11 @@ export default function BurntCV() {
       return;
     }
     if (byok) return void doRoast("byok");
-    if (hasPass && roastsToday < 5) return void doRoast("lifetime");
+    if (hasPass && passRoastsLeft > 0) return void doRoast("lifetime");
     if (hasPass) {
-      // Pass holder, out of today's 5 → offer a ₹5 top-up.
-      setPaywallReason("daily");
+      // Pass out of allowance → India: today's 5 are gone, offer a ₹5 top-up.
+      // International: all 400 are gone, offer a fresh Pass.
+      setPaywallReason(isIN ? "daily" : "passcap");
       go("paywall");
       return;
     }
@@ -359,7 +410,7 @@ export default function BurntCV() {
     // Free roast spent, no pass → pay to keep roasting.
     setPaywallReason("roast");
     go("paywall");
-  }, [resumeText, byok, hasPass, roastsToday, freeRoastUsed, intensity, go, toastMsg, doRoast]);
+  }, [resumeText, byok, hasPass, passRoastsLeft, isIN, freeRoastUsed, intensity, go, toastMsg, doRoast]);
 
   // Runs the actual Glow-Up call. `paid=true` means the user just paid ₹49 for
   // this one, so the server must NOT spend a Pass credit on it.
@@ -401,6 +452,31 @@ export default function BurntCV() {
     setPaywallReason("glowup");
     go("paywall");
   }, [byok, hasPass, glowupsLeft, execGlowup, go]);
+
+  // Copy a single string (used by the summary card).
+  const copyText = useCallback(
+    (text: string, note: string) => {
+      navigator.clipboard?.writeText(text);
+      toastMsg(note);
+    },
+    [toastMsg],
+  );
+
+  // Assemble the summary + every rewritten bullet into one pasteable block —
+  // the "the ₹49 was a steal" moment.
+  const copyGlowup = useCallback(() => {
+    if (!glowup) return;
+    const block = [
+      "SUMMARY",
+      glowup.summary,
+      "",
+      "BULLETS",
+      ...glowup.rewrites.map((r) => "• " + r.after),
+    ].join("\n");
+    navigator.clipboard?.writeText(block);
+    ev("glowup_copy");
+    toastMsg("Copied — paste it straight into your résumé ✨");
+  }, [glowup, toastMsg]);
 
   const buy = useCallback(
     async (plan: Plan) => {
@@ -470,7 +546,7 @@ export default function BurntCV() {
   // International purchases → redirect to Creem's hosted checkout. On return the
   // mount effect confirms payment and mints the Pass / runs the Glow-Up. If Creem
   // isn't reachable, tell the user. `creemLoading` tracks whichever is opening.
-  const [creemLoading, setCreemLoading] = useState<null | "pass" | "glowup">(null);
+  const [creemLoading, setCreemLoading] = useState<null | "pass" | "glowup" | "glowup_topup">(null);
   const buyCreem = useCallback(async () => {
     setCreemLoading("pass");
     const ok = await startCreemCheckout("pass");
@@ -482,6 +558,15 @@ export default function BurntCV() {
   const buyCreemGlowup = useCallback(async () => {
     setCreemLoading("glowup");
     const ok = await startCreemCheckout("glowup");
+    if (!ok) {
+      setCreemLoading(null);
+      toastMsg("Couldn’t open checkout — try again in a moment.");
+    }
+  }, [toastMsg]);
+  // A Pass holder past their 4 included Glow-Ups → the cheaper $3.99 top-up.
+  const buyCreemTopup = useCallback(async () => {
+    setCreemLoading("glowup_topup");
+    const ok = await startCreemCheckout("glowup_topup");
     if (!ok) {
       setCreemLoading(null);
       toastMsg("Couldn’t open checkout — try again in a moment.");
@@ -628,11 +713,12 @@ export default function BurntCV() {
           year: "numeric",
         })
       : "";
-  const isIN = region === "IN";
   const usageLabel = byok
     ? "∞ Key"
     : hasPass
-      ? `${roastsToday}/5`
+      ? isIN
+        ? `${roastsToday}/5`
+        : `${passRoasts}/${INTL_ROAST_CAP}`
       : freeRoastUsed
         ? isIN
           ? "₹7/roast"
@@ -642,20 +728,24 @@ export default function BurntCV() {
     byok || (!hasPass && !freeRoastUsed)
       ? "100%"
       : hasPass
-        ? (Math.min(roastsToday, 5) / 5) * 100 + "%"
+        ? isIN
+          ? (Math.min(roastsToday, 5) / 5) * 100 + "%"
+          : (Math.min(passRoasts, INTL_ROAST_CAP) / INTL_ROAST_CAP) * 100 + "%"
         : "0%";
   const usageNote = byok
     ? "Unlimited via your own Claude API key."
     : hasPass
-      ? roastsToday >= 5
-        ? isIN
+      ? isIN
+        ? roastsToday >= 5
           ? "You’ve used today’s 5 roasts — back tomorrow, or grab a ₹5 top-up."
-          : "You’ve used today’s 5 roasts — back tomorrow."
-        : `6-Month Pass: 5 roasts a day · ${glowupsLeft} Glow-Up${glowupsLeft === 1 ? "" : "s"} left. Renews ${passExpiry}.`
+          : `6-Month Pass: 5 roasts a day · ${glowupsLeft} Glow-Up${glowupsLeft === 1 ? "" : "s"} left. Renews ${passExpiry}.`
+        : passRoastsLeft <= 0
+          ? "You’ve used all 400 roasts on your Pass — grab a new 6-Month Pass to keep going."
+          : `6-Month Pass: ${passRoastsLeft} of 400 roasts left · ${glowupsLeft} Glow-Up${glowupsLeft === 1 ? "" : "s"} left. Renews ${passExpiry}.`
       : freeRoastUsed
         ? isIN
           ? "Your free roast is used. ₹7 per roast, or ₹199 for 5 a day for 6 months."
-          : "Your free roast is used. Get the 6-Month Pass for 5 a day, 6 months."
+          : "Your free roast is used. Get the 6-Month Pass — 400 roasts over 6 months."
         : "Your first roast is on us — everything unlocked.";
 
   const cardLabel = isLinkedIn
@@ -674,30 +764,36 @@ export default function BurntCV() {
   const paywallEmoji =
     paywallReason === "daily"
       ? "🔥"
-      : paywallReason === "watermark"
-        ? "💧"
-        : isGlowup
-          ? "✨"
-          : isUnhinged
-            ? "💀"
-            : "⚡";
+      : paywallReason === "passcap"
+        ? "🔄"
+        : paywallReason === "watermark"
+          ? "💧"
+          : isGlowup
+            ? "✨"
+            : isUnhinged
+              ? "💀"
+              : "⚡";
   const paywallTitle =
     paywallReason === "daily"
       ? "That's your 5 for today."
-      : paywallReason === "watermark"
-        ? "Watermark-free is a Pass perk."
-        : isGlowup
-          ? "Now let's fix it. ✨"
-          : isUnhinged
-            ? "Unhinged is no-mercy mode. 💀"
-            : paywallReason === "roast"
-              ? "Loved your free roast?"
-              : "Roast without limits.";
+      : paywallReason === "passcap"
+        ? "That's all 400 roasts."
+        : paywallReason === "watermark"
+          ? "Watermark-free is a Pass perk."
+          : isGlowup
+            ? "Now let's fix it. ✨"
+            : isUnhinged
+              ? "Unhinged is no-mercy mode. 💀"
+              : paywallReason === "roast"
+                ? "Loved your free roast?"
+                : "Roast without limits.";
   const paywallSub =
     paywallReason === "daily"
       ? isIN
         ? "Your Pass gives you 5 a day and you’ve used them. Grab a ₹5 top-up, or come back tomorrow."
         : "Your Pass gives you 5 roasts a day — you’ve used them. Come back tomorrow."
+      : paywallReason === "passcap"
+        ? "You’ve used all 400 roasts on your 6-Month Pass. Grab a new one — $9.99 for another 400 over 6 months."
       : paywallReason === "watermark"
         ? "Get the 6-Month Pass to drop the watermark on every card you share."
         : isGlowup
@@ -711,21 +807,27 @@ export default function BurntCV() {
             : paywallReason === "roast"
               ? isIN
                 ? "Your first one was on us. Keep roasting — ₹7 a pop, or ₹199 for 5 a day, 6 months."
-                : "Your first one was on us. Get the 6-Month Pass — 5 roasts a day for 6 months."
+                : "Your first one was on us. Get the 6-Month Pass — 400 roasts over 6 months."
               : isIN
                 ? "₹7 per roast, or ₹199 for 5 roasts a day for 6 months."
-                : "The 6-Month Pass — 5 roasts a day for 6 months.";
+                : "The 6-Month Pass — 400 roasts over 6 months.";
   // India (Razorpay) shows the micro-roast + ₹199 Pass cards. The rest of the
-  // world (Creem) buys the $9.99 Pass — plus, on a Glow-Up prompt, a standalone
-  // $4.99 Glow-Up. No international per-roast micro-charge (fees eat sub-$1).
+  // world (Creem) buys the $9.99 Pass — plus, on a Glow-Up prompt, either a
+  // standalone $4.99 Glow-Up (non-Pass) or a $3.99 top-up (Pass, 4 used up). No
+  // international per-roast micro-charge (fees eat sub-$1).
   const showSingle = isIN && paywallReason !== "watermark";
   // Don't re-upsell the Pass to someone who already holds one (e.g. a Pass
-  // holder who's used their 4 Glow-Ups and is now buying a ₹49 top-up).
+  // holder who's used their 4 Glow-Ups and is now buying a ₹49 top-up) — EXCEPT
+  // when their intl Pass is out of its 400 roasts ("passcap"), where the whole
+  // point is to sell them a fresh Pass.
   const showLifetime = isIN && paywallReason !== "daily" && !hasPass;
-  const showCreem = !isIN && paywallReason !== "daily" && !hasPass;
+  const showCreem =
+    !isIN && paywallReason !== "daily" && (!hasPass || paywallReason === "passcap");
   // The standalone international Glow-Up ($4.99) — only on a Glow-Up prompt, and
   // not for Pass holders (their Pass already includes Glow-Ups).
   const showCreemGlowup = !isIN && isGlowup && !hasPass;
+  // The cheaper $3.99 Glow-Up top-up — an intl Pass holder who's used all 4.
+  const showCreemTopup = !isIN && isGlowup && hasPass && glowupsLeft <= 0;
   // Pass holders past 5/day pay a ₹5 top-up; the Glow-Up is ₹49; a single roast ₹7.
   const isDaily = paywallReason === "daily";
   const payPlan: Plan = isGlowup ? "glowup" : isDaily ? "topup" : "single";
@@ -1672,20 +1774,50 @@ export default function BurntCV() {
               )}
               {glowup && (
                 <>
+                  {/* Hireability arc — the "was X, now Y" payoff, animated up. */}
+                  <ScoreArc before={glowup.score_before} after={glowup.score_after} />
+
+                  {/* The single highest-leverage change — start here. */}
+                  <div
+                    style={css(
+                      "border:1.5px solid rgba(237,50,55,.28);background:linear-gradient(180deg,rgba(237,50,55,.06),transparent);border-radius:16px;padding:16px 17px;",
+                    )}
+                  >
+                    <div style={css(GLOW_LABEL + "color:#ed3237;margin-bottom:7px;")}>
+                      ⚡ START HERE
+                    </div>
+                    <p style={css("margin:0;font-size:15.5px;font-weight:700;line-height:1.45;color:#0f0623;")}>
+                      {glowup.one_thing}
+                    </p>
+                  </div>
+
+                  {/* The one storyline every bullet should sell. */}
                   <div style={css("background:#4e3188;color:#fff;border-radius:16px;padding:17px;")}>
                     <div style={css("font-size:10px;letter-spacing:.14em;font-weight:700;opacity:.85;")}>
-                      🧵 THE MISSING THREAD
+                      🧵 THE THREAD TO SELL
                     </div>
-                    <p style={css("margin:9px 0 0;font-size:15px;line-height:1.5;")}>{glowup.summary}</p>
+                    <p style={css("margin:9px 0 0;font-size:15px;line-height:1.5;")}>{glowup.narrative}</p>
                   </div>
-                  <div>
-                    <div
-                      style={css(
-                        "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.14em;font-weight:700;color:#0f0623;margin-bottom:10px;",
-                      )}
-                    >
-                      REWRITES
+
+                  {/* Pasteable, rewritten professional summary. */}
+                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;")}>
+                      <div style={css(GLOW_LABEL)}>📝 YOUR NEW SUMMARY</div>
+                      <button
+                        onClick={() => copyText(glowup.summary, "Summary copied ✨")}
+                        style={css(
+                          "border:1px solid rgba(78,49,136,.3);background:#fff;color:#4e3188;cursor:pointer;font-size:11px;font-weight:800;padding:5px 11px;border-radius:999px;",
+                        )}
+                      >
+                        Copy
+                      </button>
                     </div>
+                    <p style={css("margin:0;font-size:14px;line-height:1.55;color:#222;")}>{glowup.summary}</p>
+                  </div>
+
+                  {/* Before → after rewrites, with the blanks-to-fill highlighted. */}
+                  <div>
+                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>REWRITES</div>
                     <div style={css("display:flex;flex-direction:column;gap:10px;")}>
                       {glowup.rewrites.map((g, i) => (
                         <div
@@ -1712,41 +1844,109 @@ export default function BurntCV() {
                             </span>
                             <div
                               style={css(
-                                "font-size:13.5px;color:#0f0623;line-height:1.45;margin-top:5px;font-weight:600;",
+                                "font-size:13.5px;color:#0f0623;line-height:1.5;margin-top:5px;font-weight:600;",
                               )}
                             >
-                              {g.after}
+                              {hlPlaceholders(g.after)}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
+                    <p style={css("margin:9px 2px 0;font-size:11.5px;color:#9c8a00;line-height:1.4;")}>
+                      <span style={css(PH_STYLE + "font-size:11px;")}>[like this]</span> = fill in with a
+                      real number from your work. Never a made-up one.
+                    </p>
                   </div>
+
+                  {/* Filler to delete, with the reason it hurts. */}
                   <div>
-                    <div
-                      style={css(
-                        "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.14em;font-weight:700;color:#0f0623;margin-bottom:10px;",
-                      )}
-                    >
-                      ✂️ CUT THESE
-                    </div>
-                    <div style={css("display:flex;flex-wrap:wrap;gap:8px;")}>
+                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>✂️ CUT THESE</div>
+                    <div style={css("display:flex;flex-direction:column;gap:8px;")}>
                       {glowup.cut.map((c, i) => (
+                        <div
+                          key={i}
+                          style={css(
+                            "display:flex;gap:10px;align-items:baseline;background:rgba(237,50,55,.05);border:1px solid rgba(237,50,55,.14);border-radius:12px;padding:10px 13px;",
+                          )}
+                        >
+                          <span
+                            style={css(
+                              "font-size:13px;font-weight:700;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);flex:none;",
+                            )}
+                          >
+                            {c.text}
+                          </span>
+                          <span style={css("font-size:12px;color:#7a5a63;line-height:1.4;")}>— {c.why}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* What a recruiter silently assumes — and the reframe. */}
+                  <GlowList label="👁️ WHAT RECRUITERS READ" items={glowup.recruiter_read} />
+
+                  {/* Keywords an ATS filters on that are missing. */}
+                  <div>
+                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🤖 ATS BLIND SPOTS</div>
+                    <div style={css("display:flex;flex-wrap:wrap;gap:8px;")}>
+                      {glowup.ats_gaps.map((k, i) => (
                         <span
                           key={i}
                           style={css(
-                            "background:rgba(237,50,55,.07);color:#b3245f;border:1px solid rgba(237,50,55,.18);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:600;",
+                            "background:rgba(78,49,136,.08);color:#4e3188;border:1px solid rgba(78,49,136,.2);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:600;line-height:1.3;",
                           )}
                         >
-                          {c}
+                          {k}
                         </span>
                       ))}
                     </div>
                   </div>
+
+                  {/* Pointed questions this résumé invites. */}
+                  <GlowList label="💣 INTERVIEW LANDMINES" items={glowup.interview_landmines} />
+
+                  {/* Where this résumé can go next + what to add. */}
+                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <div style={css(GLOW_LABEL + "margin-bottom:11px;")}>🚀 WHERE THIS GOES NEXT</div>
+                    <div style={css("display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;")}>
+                      {glowup.next_moves.roles.map((r, i) => (
+                        <span
+                          key={i}
+                          style={css(
+                            "background:#0f0623;color:#fff;border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;",
+                          )}
+                        >
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={css("display:flex;flex-direction:column;gap:7px;")}>
+                      {glowup.next_moves.gaps.map((g, i) => (
+                        <div
+                          key={i}
+                          style={css("display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#333;line-height:1.45;")}
+                        >
+                          <span style={css("color:#1f8a5b;font-weight:800;flex:none;")}>+</span>
+                          {g}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Assemble summary + fixed bullets into one pasteable block. */}
+                  <button
+                    onClick={copyGlowup}
+                    style={css(
+                      "width:100%;border:none;cursor:pointer;padding:16px;border-radius:14px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:16px;box-shadow:0 14px 26px -12px rgba(237,50,55,.6);",
+                    )}
+                  >
+                    📋 Copy the whole rewrite
+                  </button>
                   <button
                     onClick={() => go("card")}
                     style={css(
-                      "width:100%;border:1.5px solid #4e3188;background:#fff;color:#4e3188;cursor:pointer;padding:15px;border-radius:14px;font-weight:800;font-size:15px;margin-top:4px;",
+                      "width:100%;border:1.5px solid #4e3188;background:#fff;color:#4e3188;cursor:pointer;padding:14px;border-radius:14px;font-weight:800;font-size:15px;",
                     )}
                   >
                     Back to the share card 🔥
@@ -1876,6 +2076,35 @@ export default function BurntCV() {
                 </div>
               )}
 
+              {showCreemTopup && (
+                <div
+                  style={css(
+                    "border:1.5px solid rgba(15,6,35,.14);border-radius:18px;padding:17px 18px;display:flex;align-items:center;gap:14px;",
+                  )}
+                >
+                  <div style={css("flex:1;")}>
+                    <div style={css("display:flex;align-items:baseline;gap:7px;")}>
+                      <span style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;")}>
+                        $3.99
+                      </span>
+                      <span style={css("font-size:13px;color:#808080;font-weight:600;")}>another Glow-Up</span>
+                    </div>
+                    <div style={css("font-size:12.5px;color:#5a5a5a;line-height:1.4;margin-top:3px;")}>
+                      You’ve used your 4 included ones — extras are $3.99 each on the Pass.
+                    </div>
+                  </div>
+                  <button
+                    onClick={buyCreemTopup}
+                    disabled={!!creemLoading}
+                    style={css(
+                      "flex:none;border:none;cursor:pointer;padding:13px 18px;border-radius:13px;background:#0f0623;color:#fff;font-weight:800;font-size:15px;",
+                    )}
+                  >
+                    {creemLoading === "glowup_topup" ? "…" : "$3.99"}
+                  </button>
+                </div>
+              )}
+
               {showCreem && (
                 <div
                   style={css(
@@ -1891,11 +2120,11 @@ export default function BurntCV() {
                   </div>
                   <div style={css("display:flex;align-items:baseline;gap:8px;margin-top:6px;")}>
                     <span style={css("font-size:34px;font-weight:900;letter-spacing:-.02em;")}>$9.99</span>
-                    <span style={css("font-size:14px;color:#808080;font-weight:600;")}>5 a day · 6 months.</span>
+                    <span style={css("font-size:14px;color:#808080;font-weight:600;")}>400 roasts · 6 months.</span>
                   </div>
                   <div style={css("font-weight:800;font-size:15px;margin:4px 0 14px;")}>BurntCV 6-Month Pass 🔥</div>
                   <div style={css("display:flex;flex-direction:column;gap:9px;")}>
-                    {PASS_PERKS.map((perk) => (
+                    {PASS_PERKS_INTL.map((perk) => (
                       <div
                         key={perk}
                         style={css(
@@ -2212,6 +2441,91 @@ export default function BurntCV() {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Hireability arc: counts the number up from `before` to `after` and grows the
+// bar to match — the visible "the ₹49 bought me this" payoff.
+function ScoreArc({ before, after }: { before: number; after: number }) {
+  const [val, setVal] = useState(before);
+  const [fill, setFill] = useState(false);
+  useEffect(() => {
+    setVal(before);
+    setFill(false);
+    const grow = setTimeout(() => setFill(true), 60);
+    const start = performance.now();
+    const dur = 1100;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      setVal(Math.round(before + (after - before) * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      clearTimeout(grow);
+      cancelAnimationFrame(raf);
+    };
+  }, [before, after]);
+  const delta = Math.max(0, after - before);
+  const beforePct = Math.max(0, Math.min(100, before));
+  const afterPct = Math.max(0, Math.min(100, after));
+  return (
+    <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:17px 18px;")}>
+      <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;")}>
+        <span style={css(GLOW_LABEL)}>HIREABILITY</span>
+        {delta > 0 && (
+          <span
+            style={css(
+              "background:rgba(31,138,91,.12);color:#1f8a5b;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;",
+            )}
+          >
+            +{delta} pts
+          </span>
+        )}
+      </div>
+      <div style={css("display:flex;align-items:baseline;gap:8px;margin-bottom:12px;")}>
+        <span style={css("font-size:40px;font-weight:900;letter-spacing:-.02em;color:#0f0623;line-height:1;")}>
+          {val}
+        </span>
+        <span style={css("font-size:15px;font-weight:700;color:#9c9c9c;")}>/100</span>
+        <span style={css("font-size:12.5px;color:#9c9c9c;font-weight:600;margin-left:2px;")}>
+          was {before}
+        </span>
+      </div>
+      <div style={css("position:relative;height:10px;border-radius:999px;background:rgba(15,6,35,.08);overflow:hidden;")}>
+        <div
+          style={css(
+            `position:absolute;inset:0 auto 0 0;height:100%;border-radius:999px;background:linear-gradient(90deg,#f98731,#ed3237 55%,#1f8a5b);width:${
+              fill ? afterPct : beforePct
+            }%;transition:width 1.1s cubic-bezier(.22,1,.36,1);`,
+          )}
+        ></div>
+      </div>
+    </div>
+  );
+}
+
+// A simple titled list card used for the recruiter-read and landmine sections.
+function GlowList({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div>
+      <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>{label}</div>
+      <div style={css("display:flex;flex-direction:column;gap:8px;")}>
+        {items.map((it, i) => (
+          <div
+            key={i}
+            style={css(
+              "display:flex;gap:9px;align-items:flex-start;background:#fff;border:1px solid rgba(15,6,35,.1);border-radius:12px;padding:11px 13px;font-size:13px;color:#333;line-height:1.45;",
+            )}
+          >
+            <span style={css("color:#4e3188;font-weight:800;flex:none;")}>›</span>
+            {it}
+          </div>
+        ))}
       </div>
     </div>
   );

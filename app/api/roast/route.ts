@@ -35,21 +35,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "too_short" }, { status: 400 });
   }
 
-  // Bypass the rate limit ONLY with a server-verified Pass token — the client
-  // can no longer just claim "unlimited". A valid Pass is still day-capped
-  // client-side; free/single/top-up roasts fall under the per-IP ceiling.
-  // (BYOK users call Anthropic directly and never reach this route.)
+  // A server-verified Pass bypasses the per-IP roast ceiling; free / single /
+  // top-up roasts fall under it. (BYOK users call Anthropic directly and never
+  // reach this route.)
   const pass = verifyToken(body.passToken);
   if (!pass) {
     const { allowed } = await checkAndIncrement(ipFrom(req));
     if (!allowed) {
       return NextResponse.json({ error: "rate_limited" }, { status: 429 });
     }
-    // Global platform-key spend cap: when today's Anthropic budget is spent,
-    // stop serving on the platform key and steer to BYOK (same UX as no key).
-    if (!(await budgetAvailable())) {
-      return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
-    }
+  }
+
+  // Global platform-key spend cap applies to EVERYONE — Pass holders included.
+  // Without this, a single leaked/shared Pass code could run up an unbounded
+  // Anthropic bill on the platform key. When the day's budget is spent, stop
+  // serving on the platform key and steer to BYOK (same UX as no key), Pass or
+  // not. The hard financial backstop above the honor-system client-side cap.
+  if (!(await budgetAvailable())) {
+    return NextResponse.json({ error: "budget_exhausted" }, { status: 503 });
   }
 
   const prompt =

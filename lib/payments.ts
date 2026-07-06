@@ -161,11 +161,12 @@ export async function fetchRegion(): Promise<"IN" | "INTL"> {
   }
 }
 
-export type CreemKind = "pass" | "glowup";
+export type CreemKind = "pass" | "glowup" | "glowup_topup";
 
 // Start a Creem hosted checkout → redirects the browser to Creem. `kind` picks
-// the product: the $9.99 Pass or the $4.99 one-off Glow-Up. On success Creem
-// returns to /?creem=success&kind=…&checkout_id=…
+// the product: the $9.99 Pass, the $4.99 one-off Glow-Up, or the $3.99 Glow-Up
+// top-up (a Pass holder's 5th+). On success Creem returns to
+// /?creem=success&kind=…&checkout_id=…
 export async function startCreemCheckout(kind: CreemKind = "pass"): Promise<boolean> {
   try {
     const res = await fetch("/api/creem/checkout", {

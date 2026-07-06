@@ -5,7 +5,7 @@ import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import { verifyToken, consumePassGlowup } from "@/lib/entitlements";
 import {
   buildGlowupPrompt,
-  fallbackGlowup,
+  normalizeGlowup,
   INPUT_CHAR_CAP,
   parseRoastJSON,
   type Glowup,
@@ -15,7 +15,12 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let body: { text?: string; passToken?: string; paid?: boolean };
+  let body: {
+    text?: string;
+    passToken?: string;
+    paid?: boolean;
+    jobDescription?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -58,7 +63,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const prompt = buildGlowupPrompt() + "\n\nINPUT:\n" + text;
+  const prompt = buildGlowupPrompt(body.jobDescription) + "\n\nINPUT:\n" + text;
 
   let glowup: Glowup | null = null;
   try {
@@ -73,6 +78,6 @@ export async function POST(req: Request) {
     glowup = null;
   }
 
-  if (!glowup || !Array.isArray(glowup.rewrites)) glowup = fallbackGlowup();
+  glowup = normalizeGlowup(glowup);
   return NextResponse.json({ glowup, glowupsLeft });
 }

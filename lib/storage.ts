@@ -25,7 +25,8 @@ export interface Stored {
   freeRoastUsed: boolean; // the one free roast has been spent
   apiKey: string; // BYOK — unlimited
   usageDate: string;
-  roastsToday: number; // pass daily counter (resets each day)
+  roastsToday: number; // pass daily counter (resets each day) — India 5/day model
+  passRoasts: number; // pass LIFETIME counter — international 400-per-6-months cap
   history: HistoryItem[];
 }
 
@@ -45,6 +46,7 @@ export function load(): Stored {
     apiKey: "",
     usageDate: today(),
     roastsToday: 0,
+    passRoasts: 0,
     history: [],
   };
   if (typeof window === "undefined") return empty;
@@ -70,6 +72,7 @@ export function load(): Stored {
       apiKey: u.apiKey || "",
       usageDate: today(),
       roastsToday,
+      passRoasts: Number(u.passRoasts) || 0, // lifetime — never date-reset
       history: Array.isArray(u.history) ? u.history : [],
     };
   } catch {

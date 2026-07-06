@@ -12,6 +12,7 @@ export function ev(
     | "card_share"
     | "caption_copy"
     | "glowup_run"
+    | "glowup_copy"
     | "purchase"
     | "byok_added",
   props?: Record<string, string | number | boolean>,

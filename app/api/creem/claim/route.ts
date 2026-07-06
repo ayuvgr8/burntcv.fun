@@ -31,9 +31,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unknown_product" }, { status: 422 });
   }
 
-  if (co.kind === "glowup") {
+  if (co.kind === "glowup" || co.kind === "glowup_topup") {
     // One-off unlock — the Glow-Up itself runs client-side after this confirms.
-    return NextResponse.json({ ok: true, kind: "glowup" });
+    return NextResponse.json({ ok: true, kind: co.kind });
   }
 
   // Namespace the ref so Creem checkouts never collide with Razorpay orders.

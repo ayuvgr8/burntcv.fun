@@ -9,6 +9,7 @@ import {
   buildGlowupPrompt,
   buildRoastPrompt,
   fallbackGlowup,
+  normalizeGlowup,
   fallbackRoast,
   INPUT_CHAR_CAP,
   isValidRoast,
@@ -131,8 +132,7 @@ export async function requestGlowup(args: {
         buildGlowupPrompt() + "\n\nINPUT:\n" + text,
         args.apiKey,
       );
-      const g = parseRoastJSON<Glowup>(raw);
-      return { glowup: g && Array.isArray(g.rewrites) ? g : fallbackGlowup() };
+      return { glowup: normalizeGlowup(parseRoastJSON<Glowup>(raw)) };
     } catch {
       return { glowup: fallbackGlowup() };
     }
@@ -148,9 +148,8 @@ export async function requestGlowup(args: {
     if (res.status === 402 && data?.error === "glowups_exhausted") {
       return { glowup: fallbackGlowup(), glowupsLeft: 0, exhausted: true };
     }
-    const g = data?.glowup;
     return {
-      glowup: g && Array.isArray(g.rewrites) ? g : fallbackGlowup(),
+      glowup: normalizeGlowup(data?.glowup),
       glowupsLeft:
         typeof data?.glowupsLeft === "number" ? data.glowupsLeft : undefined,
     };
