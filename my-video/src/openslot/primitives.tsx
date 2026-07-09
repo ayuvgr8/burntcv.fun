@@ -1,64 +1,67 @@
 import React from "react";
-import {
-  AbsoluteFill,
-  interpolate,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
+import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { FONT } from "./fonts";
-import { clamp, COLORS, EASE_OUT, ramp, riseIn } from "./theme";
+import { clamp, COLORS, EASE_OUT } from "./theme";
+import { Icon } from "./icons";
 
-// ── Continuous background ────────────────────────────────────────
-// Lives behind every scene so cuts feel like one continuous space.
-export const Background: React.FC = () => {
+// ── Backgrounds ──────────────────────────────────────────────────
+export const CreamBackground: React.FC = () => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
-
-  // Slow drifting accent glow.
-  const gx = interpolate(frame, [0, 1950], [0.32, 0.62]) * width;
-  const gy = interpolate(frame, [0, 1950], [0.28, 0.5]) * height;
-  const gx2 = interpolate(frame, [0, 1950], [0.78, 0.42]) * width;
-
+  const drift = interpolate(frame, [0, 300], [0, 20], clamp);
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.bgDeep }}>
+    <AbsoluteFill style={{ backgroundColor: COLORS.cream }}>
       <AbsoluteFill
         style={{
-          background: `radial-gradient(1200px 900px at ${gx}px ${gy}px, rgba(255,255,255,0.08), transparent 60%),
-             radial-gradient(1000px 800px at ${gx2}px 78%, rgba(255,255,255,0.05), transparent 62%),
-             radial-gradient(140% 120% at 50% 0%, ${COLORS.bg}, ${COLORS.bgDeep} 70%)`,
+          background: `radial-gradient(1100px 780px at ${52 + drift * 0.02}% 12%, rgba(255,255,255,0.6), transparent 60%),
+             radial-gradient(900px 700px at 85% 100%, rgba(46,162,78,0.06), transparent 60%)`,
         }}
       />
-      {/* Faint grid for depth */}
       <AbsoluteFill
         style={{
           opacity: 0.5,
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-             linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)`,
-          backgroundSize: "64px 64px",
-          maskImage:
-            "radial-gradient(80% 70% at 50% 45%, black, transparent 85%)",
-          WebkitMaskImage:
-            "radial-gradient(80% 70% at 50% 45%, black, transparent 85%)",
-        }}
-      />
-      {/* Vignette */}
-      <AbsoluteFill
-        style={{
-          boxShadow: "inset 0 0 400px 80px rgba(0,0,0,0.65)",
+          backgroundImage: `radial-gradient(rgba(26,25,21,0.05) 1px, transparent 1px)`,
+          backgroundSize: "34px 34px",
+          maskImage: "radial-gradient(90% 80% at 50% 40%, black, transparent 90%)",
+          WebkitMaskImage: "radial-gradient(90% 80% at 50% 40%, black, transparent 90%)",
         }}
       />
     </AbsoluteFill>
   );
 };
 
+export const StageBackground: React.FC = () => {
+  const frame = useCurrentFrame();
+  const gx = interpolate(frame, [0, 400], [42, 60]);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.stageDeep }}>
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(1200px 900px at ${gx}% 26%, rgba(61,180,94,0.14), transparent 60%),
+             radial-gradient(1000px 800px at 80% 92%, rgba(255,255,255,0.05), transparent 62%),
+             radial-gradient(140% 120% at 50% 0%, ${COLORS.stage}, ${COLORS.stageDeep} 72%)`,
+        }}
+      />
+      <AbsoluteFill
+        style={{
+          opacity: 0.5,
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+             linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)`,
+          backgroundSize: "60px 60px",
+          maskImage: "radial-gradient(80% 70% at 50% 45%, black, transparent 85%)",
+          WebkitMaskImage: "radial-gradient(80% 70% at 50% 45%, black, transparent 85%)",
+        }}
+      />
+      <AbsoluteFill style={{ boxShadow: "inset 0 0 420px 90px rgba(0,0,0,0.6)" }} />
+    </AbsoluteFill>
+  );
+};
+
 // ── Logo mark ────────────────────────────────────────────────────
-// The OpenSlot brand mark: a rounded-square tile with two stacked pills —
-// a lit (white) slot above a muted (gray) one. On the film's dark canvas the
-// near-black tile carries a hairline rim + slight gradient so it reads as an
-// elevated app tile. `progress` animates the two slots settling in.
-export const LogoMark: React.FC<{ size?: number; progress?: number }> = ({
+// Black tile with two stacked pills (lit white slot over a muted gray one).
+export const LogoMark: React.FC<{ size?: number; progress?: number; radius?: number }> = ({
   size = 160,
   progress = 1,
+  radius = 30,
 }) => {
   const p = interpolate(progress, [0, 1], [0, 1], clamp);
   const barW = 46;
@@ -71,22 +74,11 @@ export const LogoMark: React.FC<{ size?: number; progress?: number }> = ({
     <svg width={size} height={size} viewBox="0 0 120 120" fill="none">
       <defs>
         <linearGradient id="os-tile" x1="0" y1="0" x2="0" y2="120">
-          <stop offset="0" stopColor="#1A1A1F" />
-          <stop offset="1" stopColor="#0B0B0E" />
+          <stop offset="0" stopColor="#232019" />
+          <stop offset="1" stopColor="#111009" />
         </linearGradient>
       </defs>
-      <rect x="4" y="4" width="112" height="112" rx="30" fill="url(#os-tile)" />
-      <rect
-        x="4"
-        y="4"
-        width="112"
-        height="112"
-        rx="30"
-        fill="none"
-        stroke="rgba(255,255,255,0.12)"
-        strokeWidth="1.5"
-      />
-      {/* top slot — lit */}
+      <rect x="4" y="4" width="112" height="112" rx={radius} fill="url(#os-tile)" />
       <rect
         x={x}
         y={38}
@@ -96,14 +88,13 @@ export const LogoMark: React.FC<{ size?: number; progress?: number }> = ({
         fill="#FFFFFF"
         style={{ transformOrigin: "60px 45.5px", scale: String(0.55 + 0.45 * top), opacity: top }}
       />
-      {/* bottom slot — muted */}
       <rect
         x={x}
         y={64}
         width={barW}
         height={barH}
         rx={rx}
-        fill="#8A8A90"
+        fill="#8C8B84"
         style={{ transformOrigin: "60px 71.5px", scale: String(0.55 + 0.45 * bottom), opacity: bottom }}
       />
     </svg>
@@ -112,60 +103,246 @@ export const LogoMark: React.FC<{ size?: number; progress?: number }> = ({
 
 export const Wordmark: React.FC<{ size?: number; color?: string }> = ({
   size = 64,
-  color = COLORS.text,
+  color = COLORS.ink,
 }) => (
   <span
     style={{
       fontFamily: FONT.sans,
-      fontWeight: 700,
+      fontWeight: 800,
       fontSize: size,
-      letterSpacing: "-0.03em",
+      letterSpacing: "-0.02em",
       color,
-      display: "inline-flex",
-      alignItems: "baseline",
     }}
   >
-    Open
-    <span style={{ color: COLORS.accentSoft }}>Slot</span>
+    OpenSlot
   </span>
 );
 
-// ── Google "G" ───────────────────────────────────────────────────
-export const GoogleG: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48">
-    <path
-      fill={COLORS.google.blue}
-      d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"
-    />
-    <path
-      fill={COLORS.google.green}
-      d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"
-    />
-    <path
-      fill={COLORS.google.yellow}
-      d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"
-    />
-    <path
-      fill={COLORS.google.red}
-      d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
-    />
-  </svg>
+export const Logo: React.FC<{ size?: number; color?: string; gap?: number }> = ({
+  size = 34,
+  color = COLORS.ink,
+  gap = 12,
+}) => (
+  <div style={{ display: "flex", alignItems: "center", gap }}>
+    <LogoMark size={size} radius={size * 0.28} />
+    <Wordmark size={size * 0.62} color={color} />
+  </div>
 );
 
-// ── Cursor ───────────────────────────────────────────────────────
-export const Cursor: React.FC<{
-  x: number;
-  y: number;
-  clicking?: number; // 0..1 press amount
-  label?: string;
-}> = ({ x, y, clicking = 0, label }) => (
+// ── Eyebrow label (mono, uppercase, green dot) ───────────────────
+export const Eyebrow: React.FC<{ text: string; onDark?: boolean; style?: React.CSSProperties }> = ({
+  text,
+  onDark,
+  style,
+}) => (
+  <div
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 16px",
+      borderRadius: 999,
+      background: onDark ? "rgba(255,255,255,0.06)" : COLORS.card,
+      border: `1px solid ${onDark ? COLORS.stageLine : COLORS.line}`,
+      fontFamily: FONT.mono,
+      fontSize: 15,
+      fontWeight: 700,
+      letterSpacing: "0.14em",
+      color: onDark ? COLORS.onStageDim : COLORS.inkSoft,
+      textTransform: "uppercase",
+      ...style,
+    }}
+  >
+    <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.green }} />
+    {text}
+  </div>
+);
+
+// ── Badges ───────────────────────────────────────────────────────
+export const GreenBadge: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
+  children,
+  style,
+}) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      padding: "6px 13px",
+      borderRadius: 999,
+      background: COLORS.greenSoftBg,
+      color: COLORS.greenInk,
+      fontFamily: FONT.sans,
+      fontSize: 15,
+      fontWeight: 600,
+      ...style,
+    }}
+  >
+    {children}
+  </span>
+);
+
+export const MonoTag: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
+  children,
+  style,
+}) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "6px 12px",
+      borderRadius: 8,
+      border: `1px solid ${COLORS.lineStrong}`,
+      color: COLORS.inkSoft,
+      fontFamily: FONT.mono,
+      fontSize: 13,
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+      ...style,
+    }}
+  >
+    {children}
+  </span>
+);
+
+export const PillButton: React.FC<{ children: React.ReactNode; green?: boolean; style?: React.CSSProperties }> = ({
+  children,
+  green,
+  style,
+}) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "15px 28px",
+      borderRadius: 999,
+      background: green ? COLORS.greenBright : COLORS.pill,
+      color: green ? COLORS.onGreen : COLORS.onPill,
+      fontFamily: FONT.sans,
+      fontSize: 20,
+      fontWeight: 600,
+      ...style,
+    }}
+  >
+    {children}
+  </span>
+);
+
+// ── Avatar ───────────────────────────────────────────────────────
+export const Avatar: React.FC<{ initials: string; size?: number; color?: string }> = ({
+  initials,
+  size = 44,
+  color = COLORS.avGreen,
+}) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      background: color,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: FONT.sans,
+      fontWeight: 700,
+      fontSize: size * 0.38,
+      color: "#fff",
+      flexShrink: 0,
+    }}
+  >
+    {initials}
+  </div>
+);
+
+// ── Light app window (floats on the dark stage) ──────────────────
+export const Window: React.FC<{
+  url?: string;
+  width?: number | string;
+  height?: number | string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}> = ({ url, width = 1280, height, children, style }) => (
+  <div
+    style={{
+      width,
+      height,
+      borderRadius: 22,
+      overflow: "hidden",
+      background: COLORS.card,
+      border: `1px solid ${COLORS.line}`,
+      boxShadow: "0 50px 130px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.04)",
+      display: "flex",
+      flexDirection: "column",
+      ...style,
+    }}
+  >
+    <div
+      style={{
+        height: 50,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "0 20px",
+        background: COLORS.creamDeep,
+        borderBottom: `1px solid ${COLORS.line}`,
+      }}
+    >
+      <span style={dot("#E8836B")} />
+      <span style={dot("#E7B84E")} />
+      <span style={dot("#59C06B")} />
+      {url && (
+        <div
+          style={{
+            margin: "0 auto",
+            minWidth: 320,
+            height: 30,
+            borderRadius: 9,
+            background: "rgba(255,255,255,0.6)",
+            border: `1px solid ${COLORS.line}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "0 14px",
+            fontFamily: FONT.mono,
+            fontSize: 14,
+            color: COLORS.inkDim,
+          }}
+        >
+          <Icon.Lock size={13} color={COLORS.inkDim} />
+          {url}
+        </div>
+      )}
+    </div>
+    <div style={{ flex: 1, minHeight: 0, position: "relative", background: COLORS.card }}>{children}</div>
+  </div>
+);
+
+const dot = (c: string): React.CSSProperties => ({
+  width: 12,
+  height: 12,
+  borderRadius: "50%",
+  background: c,
+  display: "inline-block",
+});
+
+// ── Cursor (dark, for light UI) ──────────────────────────────────
+export const Cursor: React.FC<{ x: number; y: number; clicking?: number; label?: string }> = ({
+  x,
+  y,
+  clicking = 0,
+  label,
+}) => (
   <div
     style={{
       position: "absolute",
       left: x,
       top: y,
       scale: String(1 - clicking * 0.16),
-      filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
+      filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.35))",
       zIndex: 40,
     }}
   >
@@ -180,17 +357,17 @@ export const Cursor: React.FC<{
           marginLeft: -22,
           marginTop: -22,
           borderRadius: "50%",
-          border: `2px solid ${COLORS.accentSoft}`,
+          border: `2px solid ${COLORS.green}`,
           opacity: clicking * 0.7,
           scale: String(0.4 + clicking * 1.1),
         }}
       />
     )}
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
       <path
         d="M5 3l14 7-6 2 3.5 6.5-2.5 1.2L10.5 13 5 17.5V3z"
-        fill="#fff"
-        stroke="#0A0A0F"
+        fill="#1A1915"
+        stroke="#fff"
         strokeWidth="1.4"
         strokeLinejoin="round"
       />
@@ -203,11 +380,10 @@ export const Cursor: React.FC<{
           top: 20,
           padding: "5px 10px",
           borderRadius: 8,
-          background: "rgba(10,10,15,0.9)",
-          border: `1px solid ${COLORS.line}`,
-          color: COLORS.textMuted,
+          background: COLORS.ink,
+          color: COLORS.onPill,
           fontFamily: FONT.sans,
-          fontSize: 15,
+          fontSize: 14,
           whiteSpace: "nowrap",
         }}
       >
@@ -217,147 +393,22 @@ export const Cursor: React.FC<{
   </div>
 );
 
-// ── Browser / app window frame ───────────────────────────────────
-export const Window: React.FC<{
-  url?: string;
-  width?: number | string;
-  height?: number | string;
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-  accent?: boolean;
-}> = ({ url, width = 1280, height, children, style, accent }) => (
-  <div
-    style={{
-      width,
-      height,
-      borderRadius: 20,
-      overflow: "hidden",
-      background: COLORS.surface,
-      border: `1px solid ${accent ? "rgba(255,255,255,0.35)" : COLORS.line}`,
-      boxShadow:
-        "0 40px 120px -30px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
-      display: "flex",
-      flexDirection: "column",
-      ...style,
-    }}
-  >
-    <div
-      style={{
-        height: 48,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "0 18px",
-        background: COLORS.surfaceLo,
-        borderBottom: `1px solid ${COLORS.line}`,
-      }}
-    >
-      <span style={dot("#FF5F57")} />
-      <span style={dot("#FEBC2E")} />
-      <span style={dot("#28C840")} />
-      {url && (
-        <div
-          style={{
-            marginLeft: 16,
-            flex: 1,
-            maxWidth: 420,
-            height: 28,
-            borderRadius: 8,
-            background: "rgba(255,255,255,0.05)",
-            border: `1px solid ${COLORS.line}`,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "0 12px",
-            fontFamily: FONT.sans,
-            fontSize: 14,
-            color: COLORS.textDim,
-          }}
-        >
-          <span style={{ opacity: 0.7 }}>🔒</span>
-          {url}
-        </div>
-      )}
-    </div>
-    <div style={{ flex: 1, minHeight: 0, position: "relative" }}>{children}</div>
-  </div>
-);
-
-const dot = (c: string): React.CSSProperties => ({
-  width: 12,
-  height: 12,
-  borderRadius: "50%",
-  background: c,
-  display: "inline-block",
-});
-
-// ── Floating code label (permission scope chips) ─────────────────
-export const CodeLabel: React.FC<{
-  text: string;
-  progress: number;
-  style?: React.CSSProperties;
-}> = ({ text, progress, style }) => {
-  const rise = riseIn(progress * 20, 0, 18, 18);
-  return (
-    <div
-      style={{
-        position: "absolute",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 16px",
-        borderRadius: 12,
-        background: "rgba(15,15,22,0.82)",
-        border: `1px solid rgba(255,255,255,0.4)`,
-        boxShadow: `0 0 30px -6px ${COLORS.glow}`,
-        backdropFilter: "blur(8px)",
-        fontFamily: FONT.mono,
-        fontSize: 24,
-        color: COLORS.accentSoft,
-        letterSpacing: "-0.01em",
-        zIndex: 30,
-        ...rise,
-        ...style,
-      }}
-    >
-      <span
-        style={{
-          width: 9,
-          height: 9,
-          borderRadius: "50%",
-          background: COLORS.accent,
-          boxShadow: `0 0 12px ${COLORS.accent}`,
-        }}
-      />
-      {text}
-    </div>
-  );
-};
-
-// ── Subtitles (voiceover captions) ───────────────────────────────
-export const Subtitle: React.FC<{ text: string; localFrame: number; dur: number }> = ({
+// ── Subtitles (tone-aware) ───────────────────────────────────────
+export const Subtitle: React.FC<{ text: string; localFrame: number; dur: number; onDark?: boolean }> = ({
   text,
   localFrame,
   dur,
+  onDark,
 }) => {
-  const opacity = interpolate(
-    localFrame,
-    [0, 8, dur - 8, dur],
-    [0, 1, 1, 0],
-    clamp,
-  );
-  const y = interpolate(localFrame, [0, 12], [10, 0], {
-    ...clamp,
-    easing: EASE_OUT,
-  });
+  const opacity = interpolate(localFrame, [0, 8, dur - 8, dur], [0, 1, 1, 0], clamp);
+  const y = interpolate(localFrame, [0, 12], [10, 0], { ...clamp, easing: EASE_OUT });
   return (
     <div
       style={{
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: 68,
+        bottom: 70,
         display: "flex",
         justifyContent: "center",
         zIndex: 60,
@@ -368,16 +419,16 @@ export const Subtitle: React.FC<{ text: string; localFrame: number; dur: number 
     >
       <div
         style={{
-          maxWidth: 1200,
+          maxWidth: 1180,
           textAlign: "center",
           fontFamily: FONT.sans,
-          fontWeight: 500,
+          fontWeight: 600,
           fontSize: 34,
-          lineHeight: 1.3,
+          lineHeight: 1.32,
           letterSpacing: "-0.01em",
-          color: COLORS.text,
+          color: onDark ? COLORS.onStage : COLORS.ink,
           padding: "0 60px",
-          textShadow: "0 2px 20px rgba(0,0,0,0.9)",
+          textShadow: onDark ? "0 2px 20px rgba(0,0,0,0.7)" : "none",
         }}
       >
         {text}
@@ -386,33 +437,7 @@ export const Subtitle: React.FC<{ text: string; localFrame: number; dur: number 
   );
 };
 
-// Small pill used across mock UIs.
-export const Pill: React.FC<{
-  children: React.ReactNode;
-  color?: string;
-  bg?: string;
-  style?: React.CSSProperties;
-}> = ({ children, color = COLORS.textMuted, bg = "rgba(255,255,255,0.06)", style }) => (
-  <span
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "6px 12px",
-      borderRadius: 999,
-      fontFamily: FONT.sans,
-      fontSize: 16,
-      fontWeight: 500,
-      color,
-      background: bg,
-      border: `1px solid ${COLORS.line}`,
-      ...style,
-    }}
-  >
-    {children}
-  </span>
-);
-
+// Scene enter/exit envelope helper.
 export const useSceneEnter = (fadeIn = 12, fadeOut = 10) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -422,9 +447,5 @@ export const useSceneEnter = (fadeIn = 12, fadeOut = 10) => {
     [0, 1, 1, 0],
     clamp,
   );
-  const scale = interpolate(frame, [0, fadeIn], [0.985, 1], {
-    ...clamp,
-    easing: EASE_OUT,
-  });
-  return { opacity, scale, frame, durationInFrames, ramp };
+  return { opacity, frame, durationInFrames };
 };

@@ -1,60 +1,42 @@
-// Voiceover lines rendered as lower-third subtitles, timed in absolute frames
-// (30fps). These mirror the OpenSlot narration script. When a real AI voiceover
-// track is added, align each `from` to the corresponding audio and drop the
-// on-screen subtitles if desired (see README in this folder).
+// Voiceover lines as tone-aware lower-third subtitles (30fps, absolute frames).
+// `onDark` = true on the dark-stage scenes so the caption stays legible.
 
-export type Caption = { text: string; from: number; dur: number };
+export type Caption = { text: string; from: number; dur: number; onDark?: boolean };
 
 export const CAPTIONS: Caption[] = [
-  // 1 · Intro (0–150)
-  { text: "Every meeting starts with a simple question.", from: 18, dur: 56 },
-  { text: "When are you free?", from: 78, dur: 40 },
-  { text: "Today, OpenSlot answers it — automatically.", from: 120, dur: 30 },
+  // 1 · Intro (cream) 0–210
+  { text: "Every meeting used to start with the same question.", from: 18, dur: 66 },
+  { text: "Who is this — and what do they actually need?", from: 90, dur: 58 },
+  { text: "OpenSlot answers it before you ever join.", from: 152, dur: 52 },
 
-  // 2 · Connect Google (150–360)
-  { text: "Connecting your calendar takes one click.", from: 168, dur: 68 },
-  {
-    text: "OpenSlot requests only the permissions required to schedule meetings accurately.",
-    from: 246,
-    dur: 104,
-  },
+  // 2 · Bookings (stage) 210–450
+  { text: "A booking comes in — a name, a time, a call.", from: 228, dur: 78, onDark: true },
+  { text: "But now it arrives with context.", from: 314, dur: 56, onDark: true },
+  { text: "One is already briefed for your ten o'clock.", from: 378, dur: 64, onDark: true },
 
-  // 3 · Calendar list (360–660)
-  { text: "First, OpenSlot reads your list of calendars.", from: 378, dur: 80 },
-  {
-    text: "So you choose exactly which calendars are checked before accepting bookings.",
-    from: 468,
-    dur: 150,
-  },
-  { text: "Nothing more.", from: 626, dur: 30 },
+  // 3 · Voice note (cream) 450–710
+  { text: "When your guest books, they leave a thirty-second voice note.", from: 468, dur: 96 },
+  { text: "Just their voice — what they're hoping to cover.", from: 572, dur: 76 },
+  { text: "That's all it takes.", from: 664, dur: 40 },
 
-  // 4 · Availability / free-busy (660–1050)
-  {
-    text: "Next, OpenSlot checks availability across your selected calendars.",
-    from: 678,
-    dur: 108,
-  },
-  { text: "Only free time slots are shown.", from: 796, dur: 68 },
-  { text: "Busy meetings stay protected.", from: 876, dur: 68 },
-  { text: "Double bookings never happen.", from: 956, dur: 80 },
+  // 4 · Claude brief (stage) 710–1080
+  { text: "Claude reads the transcript and writes your prep.", from: 730, dur: 90, onDark: true },
+  { text: "The ask. The talking points. The flags to watch.", from: 828, dur: 92, onDark: true },
+  { text: "Ready two hours before the call.", from: 928, dur: 64, onDark: true },
+  { text: "You walk in already knowing what matters.", from: 1000, dur: 72, onDark: true },
 
-  // 5 · Booking / events (1050–1500)
-  {
-    text: "When someone books, OpenSlot creates the meeting in your Google Calendar.",
-    from: 1068,
-    dur: 128,
-  },
-  { text: "Google Meet is generated automatically.", from: 1206, dur: 84 },
-  { text: "If the booking changes, your calendar changes too.", from: 1300, dur: 100 },
-  { text: "When it's cancelled, everything stays in sync.", from: 1410, dur: 84 },
+  // 5 · Before / after (cream) 1080–1360
+  { text: "So you don't get a booking — you get a briefing.", from: 1100, dur: 96 },
+  { text: "Context, a brief, and payment, before you say hello.", from: 1216, dur: 100 },
 
-  // 6 · Privacy (1500–1740)
-  { text: "Your calendar data is used only for scheduling.", from: 1516, dur: 94 },
-  { text: "We never sell it. We never share it.", from: 1620, dur: 82 },
-  { text: "You stay in control.", from: 1706, dur: 32 },
+  // 6 · Dashboard (stage) 1360–1600
+  { text: "It all lives in one calm workspace.", from: 1380, dur: 76, onDark: true },
+  { text: "Bookings, briefs, and revenue — at a glance.", from: 1462, dur: 84, onDark: true },
 
-  // 7 · Outro (1740–1950) — closing lines resolve into the end card.
-  { text: "From availability to booking.", from: 1752, dur: 54 },
-  { text: "From Google Calendar to Google Meet.", from: 1810, dur: 54 },
-  { text: "Everything happens automatically.", from: 1866, dur: 50 },
+  // 7 · Storefront + payments (cream) 1600–1850
+  { text: "Your booking page is also your storefront.", from: 1616, dur: 80 },
+  { text: "And get paid the way India actually pays — UPI, Razorpay, or global cards.", from: 1738, dur: 100 },
+
+  // 8 · Outro (cream) 1850–2010
+  { text: "OpenSlot. Every booking, already briefed.", from: 1876, dur: 66 },
 ];
