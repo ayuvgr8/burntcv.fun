@@ -2,7 +2,7 @@ import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { FONT } from "../fonts";
 import { clamp, COLORS, riseIn } from "../theme";
-import { LogoMark, PillButton } from "../primitives";
+import { GradientOrb, PillButton, Wordmark } from "../primitives";
 import { Icon } from "../icons";
 
 export const Scene08Outro: React.FC = () => {
@@ -17,15 +17,16 @@ export const Scene08Outro: React.FC = () => {
     <AbsoluteFill
       style={{ alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 30, scale: String(cardScale) }}
     >
-      <div style={{ opacity: logo, scale: String(logoScale) }}>
-        <LogoMark size={112} radius={31} />
+      <div style={{ opacity: logo, scale: String(logoScale), display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}>
+        <GradientOrb size={104} />
+        <Wordmark size={44} />
       </div>
       <div
         style={{
           ...h,
           fontFamily: FONT.sans,
           fontWeight: 800,
-          fontSize: 82,
+          fontSize: 78,
           letterSpacing: "-0.04em",
           color: COLORS.ink,
           textAlign: "center",

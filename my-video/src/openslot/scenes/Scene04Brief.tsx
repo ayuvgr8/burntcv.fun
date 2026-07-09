@@ -21,7 +21,7 @@ export const Scene04Brief: React.FC = () => {
       <div style={eb}>
         <Eyebrow text="The artifact" onDark />
       </div>
-      <div style={{ position: "relative", scale: String(cardScale) }}>
+      <div style={{ position: "relative", scale: String(cardScale), translate: `0px ${Math.sin(frame / 28) * 5}px` }}>
         <div
           style={{
             position: "absolute",

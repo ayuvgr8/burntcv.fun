@@ -4,6 +4,31 @@ import { FONT } from "./fonts";
 import { clamp, COLORS, EASE_OUT } from "./theme";
 import { Icon } from "./icons";
 
+// ── Gradient orb (Apple-Intelligence-style, in brand greens) ─────
+export const GradientOrb: React.FC<{ size?: number; speed?: number }> = ({ size = 150, speed = 2 }) => {
+  const frame = useCurrentFrame();
+  const rot = (frame * speed) % 360;
+  const breathe = 1 + Math.sin(frame / 24) * 0.045;
+  const wobble = Math.sin(frame / 30) * 6;
+  return (
+    <div style={{ width: size, height: size, position: "relative", scale: String(breathe) }}>
+      <div style={{ position: "absolute", inset: -size * 0.25, borderRadius: "50%", background: "radial-gradient(closest-side, rgba(59,180,92,0.45), transparent 70%)", filter: "blur(10px)" }} />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "50%",
+          background: `conic-gradient(from ${rot}deg, #3BB45C, #7FD79A, #35B8A0, #E7C24E, #6FD08A, #2EA24E, #3BB45C)`,
+          filter: `blur(${size * 0.05}px)`,
+          rotate: `${wobble}deg`,
+        }}
+      />
+      <div style={{ position: "absolute", inset: size * 0.14, borderRadius: "50%", background: `conic-gradient(from ${-rot * 1.4}deg, rgba(255,255,255,0.0), rgba(255,255,255,0.55), rgba(255,255,255,0.0) 55%)`, filter: `blur(${size * 0.04}px)` }} />
+      <div style={{ position: "absolute", left: "28%", top: "22%", width: "30%", height: "30%", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.9), transparent 65%)", filter: "blur(4px)" }} />
+    </div>
+  );
+};
+
 // ── Backgrounds ──────────────────────────────────────────────────
 export const CreamBackground: React.FC = () => {
   const frame = useCurrentFrame();
