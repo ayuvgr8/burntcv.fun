@@ -18,8 +18,8 @@ const MeetTile: React.FC = () => (
     </div>
     <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, padding: 20 }}>
       {[
-        ["AK", "#7C6BFF", "#4CC2FF"],
-        ["PA", "#4CC2FF", "#37D98A"],
+        ["AK", "#4A4A52", "#75757E"],
+        ["PA", "#3E3E47", "#68686F"],
       ].map(([ini, a, b]) => (
         <div key={ini} style={{ borderRadius: 16, background: "#131319", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${COLORS.line}` }}>
           <div style={{ width: 92, height: 92, borderRadius: "50%", background: `linear-gradient(135deg, ${a}, ${b})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 34 }}>
@@ -123,8 +123,8 @@ export const Scene07Outro: React.FC = () => {
             color: COLORS.accentSoft,
             padding: "12px 28px",
             borderRadius: 999,
-            border: `1px solid rgba(124,107,255,0.4)`,
-            background: "rgba(124,107,255,0.08)",
+            border: `1px solid rgba(255,255,255,0.4)`,
+            background: "rgba(255,255,255,0.08)",
           }}
         >
           openslot.io

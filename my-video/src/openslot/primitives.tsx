@@ -23,8 +23,8 @@ export const Background: React.FC = () => {
     <AbsoluteFill style={{ backgroundColor: COLORS.bgDeep }}>
       <AbsoluteFill
         style={{
-          background: `radial-gradient(1200px 900px at ${gx}px ${gy}px, rgba(124,107,255,0.18), transparent 60%),
-             radial-gradient(1000px 800px at ${gx2}px 78%, rgba(76,194,255,0.10), transparent 62%),
+          background: `radial-gradient(1200px 900px at ${gx}px ${gy}px, rgba(255,255,255,0.08), transparent 60%),
+             radial-gradient(1000px 800px at ${gx2}px 78%, rgba(255,255,255,0.05), transparent 62%),
              radial-gradient(140% 120% at 50% 0%, ${COLORS.bg}, ${COLORS.bgDeep} 70%)`,
         }}
       />
@@ -52,62 +52,59 @@ export const Background: React.FC = () => {
 };
 
 // ── Logo mark ────────────────────────────────────────────────────
-// Rounded app-icon square holding a calendar with one lit "open slot".
+// The OpenSlot brand mark: a rounded-square tile with two stacked pills —
+// a lit (white) slot above a muted (gray) one. On the film's dark canvas the
+// near-black tile carries a hairline rim + slight gradient so it reads as an
+// elevated app tile. `progress` animates the two slots settling in.
 export const LogoMark: React.FC<{ size?: number; progress?: number }> = ({
   size = 160,
   progress = 1,
 }) => {
-  const draw = interpolate(progress, [0, 1], [0, 1], clamp);
+  const p = interpolate(progress, [0, 1], [0, 1], clamp);
+  const barW = 46;
+  const barH = 15;
+  const x = 60 - barW / 2;
+  const rx = barH / 2;
+  const top = interpolate(p, [0, 0.6], [0, 1], clamp);
+  const bottom = interpolate(p, [0.4, 1], [0, 1], clamp);
   return (
     <svg width={size} height={size} viewBox="0 0 120 120" fill="none">
       <defs>
-        <linearGradient id="os-mark" x1="0" y1="0" x2="120" y2="120">
-          <stop offset="0" stopColor="#8A79FF" />
-          <stop offset="1" stopColor="#5B49E0" />
-        </linearGradient>
-        <linearGradient id="os-slot" x1="0" y1="0" x2="0" y2="120">
-          <stop offset="0" stopColor="#EAE6FF" />
-          <stop offset="1" stopColor="#B9AEFF" />
+        <linearGradient id="os-tile" x1="0" y1="0" x2="0" y2="120">
+          <stop offset="0" stopColor="#1A1A1F" />
+          <stop offset="1" stopColor="#0B0B0E" />
         </linearGradient>
       </defs>
-      <rect x="6" y="6" width="108" height="108" rx="30" fill="url(#os-mark)" />
+      <rect x="4" y="4" width="112" height="112" rx="30" fill="url(#os-tile)" />
       <rect
-        x="6"
-        y="6"
-        width="108"
-        height="108"
+        x="4"
+        y="4"
+        width="112"
+        height="112"
         rx="30"
         fill="none"
-        stroke="rgba(255,255,255,0.25)"
+        stroke="rgba(255,255,255,0.12)"
         strokeWidth="1.5"
       />
-      {/* calendar body */}
+      {/* top slot — lit */}
       <rect
-        x="30"
-        y="34"
-        width="60"
-        height="54"
-        rx="12"
-        fill="rgba(255,255,255,0.14)"
-        stroke="rgba(255,255,255,0.5)"
-        strokeWidth="2.5"
+        x={x}
+        y={38}
+        width={barW}
+        height={barH}
+        rx={rx}
+        fill="#FFFFFF"
+        style={{ transformOrigin: "60px 45.5px", scale: String(0.55 + 0.45 * top), opacity: top }}
       />
-      {/* hanger dots */}
-      <circle cx="45" cy="32" r="4" fill="#fff" />
-      <circle cx="75" cy="32" r="4" fill="#fff" />
-      {/* the lit open slot */}
+      {/* bottom slot — muted */}
       <rect
-        x="42"
-        y="58"
-        width="36"
-        height="12"
-        rx="6"
-        fill="url(#os-slot)"
-        style={{
-          transformOrigin: "60px 64px",
-          scale: String(0.4 + 0.6 * draw),
-          opacity: draw,
-        }}
+        x={x}
+        y={64}
+        width={barW}
+        height={barH}
+        rx={rx}
+        fill="#8A8A90"
+        style={{ transformOrigin: "60px 71.5px", scale: String(0.55 + 0.45 * bottom), opacity: bottom }}
       />
     </svg>
   );
@@ -236,7 +233,7 @@ export const Window: React.FC<{
       borderRadius: 20,
       overflow: "hidden",
       background: COLORS.surface,
-      border: `1px solid ${accent ? "rgba(124,107,255,0.35)" : COLORS.line}`,
+      border: `1px solid ${accent ? "rgba(255,255,255,0.35)" : COLORS.line}`,
       boxShadow:
         "0 40px 120px -30px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
       display: "flex",
@@ -312,7 +309,7 @@ export const CodeLabel: React.FC<{
         padding: "10px 16px",
         borderRadius: 12,
         background: "rgba(15,15,22,0.82)",
-        border: `1px solid rgba(124,107,255,0.4)`,
+        border: `1px solid rgba(255,255,255,0.4)`,
         boxShadow: `0 0 30px -6px ${COLORS.glow}`,
         backdropFilter: "blur(8px)",
         fontFamily: FONT.mono,

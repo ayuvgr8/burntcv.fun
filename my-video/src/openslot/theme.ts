@@ -7,25 +7,30 @@ import { Easing, interpolate } from "remotion";
 export const COLORS = {
   bg: "#08080C",
   bgDeep: "#050507",
-  surface: "#131319",
-  surfaceHi: "#1B1B23",
-  surfaceLo: "#0E0E13",
+  surface: "#131316",
+  surfaceHi: "#1C1C20",
+  surfaceLo: "#0E0E11",
   line: "rgba(255,255,255,0.08)",
-  lineStrong: "rgba(255,255,255,0.14)",
+  lineStrong: "rgba(255,255,255,0.16)",
 
   text: "#F5F5F7",
-  textMuted: "#9A9AA6",
-  textDim: "#5C5C68",
+  textMuted: "#9A9AA2",
+  textDim: "#5C5C64",
 
-  accent: "#7C6BFF",
-  accentSoft: "#A79BFF",
-  accent2: "#4CC2FF",
-  glow: "rgba(124,107,255,0.55)",
+  // Monochrome brand system: white is the emphasis "accent". Anything filled
+  // with `accent` puts `onAccent` (near-black) on top of it.
+  accent: "#F4F4F6",
+  accentSoft: "#B7B7BF",
+  accent2: "#7E7E86",
+  onAccent: "#0A0A0E",
+  glow: "rgba(255,255,255,0.22)",
 
-  success: "#37D98A",
-  danger: "#FF5C7A",
-  busy: "#26262F",
+  // Status colors are grayscale too; meaning is carried by icon + copy.
+  success: "#EDEDF2",
+  danger: "#B4B4BC",
+  busy: "#212127",
 
+  // Google keeps its real brand colors in the OAuth scene only.
   google: {
     blue: "#4285F4",
     red: "#EA4335",

@@ -60,8 +60,8 @@ export const Scene02Connect: React.FC = () => {
                     gap: 14,
                     padding: "16px 18px",
                     borderRadius: 14,
-                    background: active ? "rgba(124,107,255,0.12)" : COLORS.surface,
-                    border: `1px solid ${isCurrent ? "rgba(124,107,255,0.6)" : COLORS.line}`,
+                    background: active ? "rgba(255,255,255,0.12)" : COLORS.surface,
+                    border: `1px solid ${isCurrent ? "rgba(255,255,255,0.6)" : COLORS.line}`,
                     boxShadow: isCurrent ? `0 0 30px -8px ${COLORS.glow}` : "none",
                   }}
                 >
@@ -80,7 +80,7 @@ export const Scene02Connect: React.FC = () => {
                   >
                     {active && (
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                        <path d="M5 12l5 5 9-11" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M5 12l5 5 9-11" stroke={COLORS.onAccent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
                   </div>

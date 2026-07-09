@@ -12,8 +12,8 @@ const card: React.CSSProperties = {
 const Avatar: React.FC<{ initials: string; size?: number; from?: string; to?: string }> = ({
   initials,
   size = 44,
-  from = "#7C6BFF",
-  to = "#4CC2FF",
+  from = "#4A4A52",
+  to = "#75757E",
 }) => (
   <div
     style={{
@@ -72,7 +72,7 @@ export const DashboardMock: React.FC = () => {
               fontSize: 16,
               fontWeight: i === 1 ? 600 : 500,
               color: i === 1 ? COLORS.text : COLORS.textMuted,
-              background: i === 1 ? "rgba(124,107,255,0.14)" : "transparent",
+              background: i === 1 ? "rgba(255,255,255,0.14)" : "transparent",
             }}
           >
             {n}
@@ -114,7 +114,7 @@ export const DashboardMock: React.FC = () => {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {bookings.map((b) => (
               <div key={b.who} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <Avatar initials={b.who[0]} size={38} from="#4CC2FF" to="#7C6BFF" />
+                <Avatar initials={b.who[0]} size={38} from="#3E3E47" to="#68686F" />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.text }}>{b.who}</div>
                   <div style={{ fontSize: 14, color: COLORS.textDim }}>{b.when}</div>
@@ -123,8 +123,8 @@ export const DashboardMock: React.FC = () => {
                   style={{
                     fontSize: 13,
                     color: COLORS.accentSoft,
-                    background: "rgba(124,107,255,0.12)",
-                    border: `1px solid rgba(124,107,255,0.25)`,
+                    background: "rgba(255,255,255,0.12)",
+                    border: `1px solid rgba(255,255,255,0.25)`,
                     padding: "5px 12px",
                     borderRadius: 999,
                   }}
@@ -236,7 +236,7 @@ export const ConsentMock: React.FC<{ reveal?: number; highlight?: number }> = ({
         OpenSlot wants access to your Google Account
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, color: COLORS.textMuted, fontSize: 16 }}>
-        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "linear-gradient(135deg,#7C6BFF,#4CC2FF)" }} />
+        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "linear-gradient(135deg,#4A4A52,#75757E)" }} />
         alex@company.com
       </div>
       <div style={{ height: 1, background: COLORS.line, margin: "22px 0" }} />
@@ -256,8 +256,8 @@ export const ConsentMock: React.FC<{ reveal?: number; highlight?: number }> = ({
                 gap: 14,
                 padding: "13px 16px",
                 borderRadius: 12,
-                background: hot ? "rgba(124,107,255,0.14)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${hot ? "rgba(124,107,255,0.5)" : COLORS.line}`,
+                background: hot ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${hot ? "rgba(255,255,255,0.5)" : COLORS.line}`,
                 boxShadow: hot ? `0 0 26px -6px ${COLORS.glow}` : "none",
                 opacity: shown ? 1 : 0.25,
                 scale: String(hot ? 1.015 : 1),
@@ -306,10 +306,10 @@ const googleBtn: React.CSSProperties = {
 
 // ── Calendar list selection ──────────────────────────────────────
 const CALS = [
-  { name: "Personal", email: "alex@gmail.com", color: "#7C6BFF" },
-  { name: "Work", email: "alex@company.com", color: "#4CC2FF" },
-  { name: "Team Calendar", email: "team@company.com", color: "#37D98A" },
-  { name: "Holidays", email: "Read-only", color: "#FBBC05", locked: true },
+  { name: "Personal", email: "alex@gmail.com", color: "#CACAD2" },
+  { name: "Work", email: "alex@company.com", color: "#9A9AA2" },
+  { name: "Team Calendar", email: "team@company.com", color: "#6E6E76" },
+  { name: "Holidays", email: "Read-only", color: "#4A4A50", locked: true },
 ];
 
 export const CalendarListMock: React.FC<{ selected?: boolean[] }> = ({
@@ -335,8 +335,8 @@ export const CalendarListMock: React.FC<{ selected?: boolean[] }> = ({
                 gap: 16,
                 padding: "18px 22px",
                 borderRadius: 14,
-                background: on ? "rgba(124,107,255,0.10)" : COLORS.surface,
-                border: `1px solid ${on ? "rgba(124,107,255,0.55)" : COLORS.line}`,
+                background: on ? "rgba(255,255,255,0.10)" : COLORS.surface,
+                border: `1px solid ${on ? "rgba(255,255,255,0.55)" : COLORS.line}`,
                 boxShadow: on ? `0 0 34px -8px ${COLORS.glow}` : "none",
                 opacity: c.locked ? 0.5 : 1,
               }}
@@ -375,7 +375,7 @@ const Checkbox: React.FC<{ on: boolean }> = ({ on }) => (
   >
     {on && (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path d="M5 12l5 5 9-11" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M5 12l5 5 9-11" stroke={COLORS.onAccent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )}
   </div>
@@ -441,7 +441,7 @@ export const BookingMock: React.FC<{
                     borderRadius: 10,
                     fontSize: 16,
                     fontWeight: on ? 700 : 500,
-                    color: on ? "#fff" : disabled ? COLORS.textDim : COLORS.text,
+                    color: on ? COLORS.onAccent : disabled ? COLORS.textDim : COLORS.text,
                     background: on ? COLORS.accent : disabled ? "transparent" : "rgba(255,255,255,0.04)",
                     boxShadow: on ? `0 0 24px -4px ${COLORS.glow}` : "none",
                   }}
@@ -492,12 +492,12 @@ const TimeSlot: React.FC<{ slot: Slot }> = ({ slot }) => {
     );
   if (slot.state === "selected")
     return (
-      <div style={{ ...base, background: COLORS.accent, color: "#fff", boxShadow: `0 0 30px -6px ${COLORS.glow}` }}>
+      <div style={{ ...base, background: COLORS.accent, color: COLORS.onAccent, boxShadow: `0 0 30px -6px ${COLORS.glow}` }}>
         {slot.time}
       </div>
     );
   return (
-    <div style={{ ...base, background: "transparent", color: COLORS.text, border: `1.5px solid rgba(124,107,255,0.55)` }}>
+    <div style={{ ...base, background: "transparent", color: COLORS.text, border: `1.5px solid rgba(255,255,255,0.55)` }}>
       {slot.time}
     </div>
   );
@@ -614,8 +614,8 @@ export const GoogleCalendarMock: React.FC<{
               top: eventTop,
               height: 96,
               borderRadius: 12,
-              background: "linear-gradient(135deg, rgba(124,107,255,0.9), rgba(91,73,224,0.9))",
-              border: "1px solid rgba(255,255,255,0.25)",
+              background: "linear-gradient(135deg, #EDEDF1, #D7D7DD)",
+              border: "1px solid rgba(255,255,255,0.5)",
               padding: "12px 16px",
               boxShadow: `0 10px 40px -10px ${COLORS.glow}`,
               opacity: eventAlpha,
@@ -623,9 +623,9 @@ export const GoogleCalendarMock: React.FC<{
               transformOrigin: "center",
             }}
           >
-            <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>30 Min Meeting</div>
-            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginTop: 3 }}>with Priya Anand</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: 13, color: "#fff" }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#16161C" }}>30 Min Meeting</div>
+            <div style={{ fontSize: 14, color: "#44444C", marginTop: 3 }}>with Priya Anand</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8, fontSize: 13, color: "#26262C" }}>
               <span>📹</span> Google Meet
             </div>
           </div>
@@ -656,8 +656,8 @@ export const GoogleCalendarMock: React.FC<{
                 padding: "12px",
                 borderRadius: 10,
                 border: "none",
-                background: COLORS.google.blue,
-                color: "#fff",
+                background: COLORS.accent,
+                color: COLORS.onAccent,
                 fontFamily: FONT.sans,
                 fontSize: 16,
                 fontWeight: 600,
@@ -692,7 +692,7 @@ export const PrivacyMock: React.FC<{ shield?: number }> = ({ shield = 1 }) => (
         <svg width="88" height="88" viewBox="0 0 24 24" fill="none">
           <path
             d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z"
-            fill="rgba(124,107,255,0.14)"
+            fill="rgba(255,255,255,0.14)"
             stroke={COLORS.accent}
             strokeWidth="1.4"
           />
