@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,9 @@ const PRICE_PAISE: Record<string, number> = {
 // Create a Razorpay order. If keys aren't configured, respond { simulated:true }
 // so the client can complete a demo purchase.
 export async function POST(req: Request) {
+  const gate = await limitPublic(ipFrom(req), "payment_order");
+  if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
+
   let plan = "single";
   try {
     const body = await req.json();

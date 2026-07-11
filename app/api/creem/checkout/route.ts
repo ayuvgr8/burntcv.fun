@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createCheckout, creemConfiguredFor, type CreemKind } from "@/lib/creem";
+import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,9 @@ export const runtime = "nodejs";
 // the claim step re-verifies the product server-side, so the `kind` in the URL
 // is only a UX hint, never trusted for entitlement.
 export async function POST(req: Request) {
+  const gate = await limitPublic(ipFrom(req), "creem_checkout");
+  if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
+
   let kind: CreemKind = "pass";
   try {
     const body = await req.json().catch(() => ({}));

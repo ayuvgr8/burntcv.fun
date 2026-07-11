@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRedis } from "@/lib/redis";
+import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,10 @@ export const dynamic = "force-dynamic";
 // résumés" promise is untouched.
 const BASE = 48210;
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await limitPublic(ipFrom(req), "stats");
+  if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
+
   let n = 0;
   try {
     const raw = await getRedis()?.get<string>("roast:count");

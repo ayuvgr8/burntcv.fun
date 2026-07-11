@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { ensurePassForOrder } from "@/lib/entitlements";
+import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,9 @@ export const runtime = "nodejs";
 // Signature = HMAC_SHA256(order_id + "|" + payment_id, key_secret).
 // On a verified Pass (₹199) payment, mint the durable entitlement + token.
 export async function POST(req: Request) {
+  const gate = await limitPublic(ipFrom(req), "payment_verify");
+  if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
+
   let body: {
     razorpay_order_id?: string;
     razorpay_payment_id?: string;
