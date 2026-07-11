@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
-import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
+import { checkAndIncrement, ipFrom, limitUser } from "@/lib/ratelimit";
 import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import {
   verifyToken,
@@ -49,6 +49,16 @@ export async function POST(req: Request) {
   const passRegion: PassRegion = pass?.region === "INTL" ? "INTL" : "IN";
   let passRoastsLeft: number | undefined;
   if (pass) {
+    // Authenticated tier: loose per-Pass burst ceiling (looser than the per-IP
+    // free limit). A real human never trips it; it stops a leaked/shared Pass
+    // code from being scripted faster than the per-Pass daily/total caps below.
+    const burst = await limitUser(pass.code, "roast");
+    if (!burst.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited", retryAfter: burst.retryAfter },
+        { status: 429, headers: { "retry-after": String(burst.retryAfter) } },
+      );
+    }
     const consumed = await consumePassRoast(pass.code, passRegion);
     if (!consumed.allowed) {
       // Distinguish so the client opens the right paywall: India → daily top-up;

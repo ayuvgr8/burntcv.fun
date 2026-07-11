@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractText, getDocumentProxy } from "unpdf";
+import { ipFrom, limitPublic } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -9,6 +10,15 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 // Extract text from an uploaded PDF, server-side (PRD §9: keep extraction on
 // the server, process ephemerally, never persist the file).
 export async function POST(req: Request) {
+  // Moderate per-IP limit — PDF parsing is CPU-heavy, so cap the burst rate.
+  const gate = await limitPublic(ipFrom(req), "extract");
+  if (!gate.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited", retryAfter: gate.retryAfter },
+      { status: 429, headers: { "retry-after": String(gate.retryAfter) } },
+    );
+  }
+
   let file: File | null = null;
   try {
     const form = await req.formData();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { callClaude } from "@/lib/anthropic";
-import { checkAndIncrement, ipFrom } from "@/lib/ratelimit";
+import { checkAndIncrement, ipFrom, limitUser } from "@/lib/ratelimit";
 import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import { verifyToken, consumePassGlowup } from "@/lib/entitlements";
 import {
@@ -48,6 +48,14 @@ export async function POST(req: Request) {
   const pass = verifyToken(body.passToken);
   let glowupsLeft: number | undefined;
   if (pass && !body.paid) {
+    // Authenticated tier: loose per-Pass burst ceiling (see roast route).
+    const burst = await limitUser(pass.code, "glowup");
+    if (!burst.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited", retryAfter: burst.retryAfter },
+        { status: 429, headers: { "retry-after": String(burst.retryAfter) } },
+      );
+    }
     const remaining = await consumePassGlowup(pass.code);
     if (remaining < 0) {
       return NextResponse.json(
