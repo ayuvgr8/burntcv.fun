@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { codeForEmail, signMagicToken } from "@/lib/entitlements";
 import { sendEmail, restoreEmailHtml } from "@/lib/email";
 import { ipFrom, limitAuth } from "@/lib/ratelimit";
+import { parseJsonBody, vEmail } from "@/lib/validate";
 
 export const runtime = "nodejs";
+
+const magicLinkSchema = { email: vEmail() };
 
 // Email the buyer a one-tap link to restore their Pass. The link goes to the
 // address ON FILE (never a token to the requester), so only the mailbox owner
@@ -14,17 +17,11 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const ip = ipFrom(req);
 
-  let body: { email?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const parsed = await parseJsonBody(req, magicLinkSchema);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: parsed.status });
   }
-
-  const email = (body.email ?? "").trim().toLowerCase();
-  if (!email || !email.includes("@")) {
-    return NextResponse.json({ error: "bad_email" }, { status: 400 });
-  }
+  const email = parsed.value.email; // validated + normalised (trimmed, lowercased)
 
   // Strict auth-tier limit: per-IP AND per-email sliding windows. We do NOT
   // ratchet the failure backoff here — the endpoint returns a uniform response

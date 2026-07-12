@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createCheckout, creemConfiguredFor, type CreemKind } from "@/lib/creem";
 import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
+import { validate, vEnum } from "@/lib/validate";
 
 export const runtime = "nodejs";
+
+const CREEM_KINDS: readonly CreemKind[] = ["pass", "glowup", "glowup_topup"];
+const checkoutSchema = { kind: vEnum(CREEM_KINDS, { optional: true, default: "pass" }) };
 
 // Start an international purchase — returns a Creem hosted-checkout URL the
 // client redirects to. `kind` picks the product: "pass" ($9.99 6-Month Pass),
@@ -14,13 +18,14 @@ export async function POST(req: Request) {
   const gate = await limitPublic(ipFrom(req), "creem_checkout");
   if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
 
-  let kind: CreemKind = "pass";
-  try {
-    const body = await req.json().catch(() => ({}));
-    if (body?.kind === "glowup" || body?.kind === "glowup_topup") kind = body.kind;
-  } catch {
-    // default to "pass"
+  // Tolerate an empty body (defaults to "pass"), but reject a present-but-
+  // invalid `kind` rather than silently coercing it.
+  const raw = await req.json().catch(() => ({}));
+  const check = validate(checkoutSchema, raw && typeof raw === "object" ? raw : {});
+  if (!check.ok) {
+    return NextResponse.json({ error: check.error, field: check.field }, { status: 400 });
   }
+  const kind: CreemKind = check.value.kind;
 
   if (!creemConfiguredFor(kind)) {
     // No keys/product configured → simulated (demo), mirroring the Razorpay flow.

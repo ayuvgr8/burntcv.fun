@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { verifyMagicToken, restorePass } from "@/lib/entitlements";
 import { ipFrom, limitAuth, recordAuthFailure, recordAuthSuccess } from "@/lib/ratelimit";
+import { parseJsonBody, vString } from "@/lib/validate";
 
 export const runtime = "nodejs";
+
+// Optional so an empty/absent token flows through verifyMagicToken → the same
+// "invalid_or_expired" path (which also ratchets the backoff).
+const magicClaimSchema = { token: vString({ optional: true, max: 4096 }) };
 
 function tooMany(retryAfter: number) {
   return NextResponse.json(
@@ -21,14 +26,12 @@ export async function POST(req: Request) {
   const gate = await limitAuth({ ip });
   if (!gate.allowed) return tooMany(gate.retryAfter);
 
-  let body: { token?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const parsed = await parseJsonBody(req, magicClaimSchema);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: parsed.status });
   }
 
-  const code = verifyMagicToken(body.token);
+  const code = verifyMagicToken(parsed.value.token);
   if (!code) {
     // Bad signature or expired (>15 min) → ask them to request a new link.
     await recordAuthFailure({ ip });

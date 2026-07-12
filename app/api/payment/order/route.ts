@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
+import { parseJsonBody, vEnum } from "@/lib/validate";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,9 @@ const PRICE_PAISE: Record<string, number> = {
   glowup: 4900, // ₹49 — the Glow-Up rewrite (4 included with the Pass, then ₹49)
   lifetime: 19900, // ₹199
 };
+const PLANS = Object.keys(PRICE_PAISE) as (keyof typeof PRICE_PAISE & string)[];
+
+const orderSchema = { plan: vEnum(PLANS, { optional: true, default: "single" }) };
 
 // Create a Razorpay order. If keys aren't configured, respond { simulated:true }
 // so the client can complete a demo purchase.
@@ -16,13 +20,11 @@ export async function POST(req: Request) {
   const gate = await limitPublic(ipFrom(req), "payment_order");
   if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
 
-  let plan = "single";
-  try {
-    const body = await req.json();
-    if (body?.plan in PRICE_PAISE) plan = body.plan;
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const parsed = await parseJsonBody(req, orderSchema);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: parsed.status });
   }
+  const plan = parsed.value.plan;
 
   const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
