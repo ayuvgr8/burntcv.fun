@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { restorePass } from "@/lib/entitlements";
 import { ipFrom, limitAuth, recordAuthFailure, recordAuthSuccess } from "@/lib/ratelimit";
+import { parseJsonBody, vString } from "@/lib/validate";
 
 export const runtime = "nodejs";
+
+// `code` is the secret restore code; `email` is only used to tailor the error
+// message (email-only restore is disabled). Both optional + length-capped —
+// the "missing code" cases are handled explicitly below.
+const restoreSchema = {
+  code: vString({ optional: true, trim: true, max: 128 }),
+  email: vString({ optional: true, trim: true, max: 254 }),
+};
 
 function tooMany(retryAfter: number) {
   return NextResponse.json(
@@ -17,12 +26,11 @@ function tooMany(retryAfter: number) {
 export async function POST(req: Request) {
   const ip = ipFrom(req);
 
-  let body: { code?: string; email?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const parsed = await parseJsonBody(req, restoreSchema);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: parsed.status });
   }
+  const body = parsed.value;
 
   // Strict, auth-tier limit: per-IP AND per-account (the restore code) sliding
   // windows + exponential backoff, so this endpoint can't be brute-forced to

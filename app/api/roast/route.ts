@@ -15,30 +15,39 @@ import {
   INPUT_CHAR_CAP,
   isValidRoast,
   parseRoastJSON,
+  PERSONAS,
+  INTENSITIES,
   type Roast,
 } from "@/lib/roast";
+import { parseJsonBody, vBool, vEnum, vString } from "@/lib/validate";
+
+const PERSONA_IDS = PERSONAS.map((p) => p.id);
+const INTENSITY_IDS = INTENSITIES.map((i) => i.id);
+
+// Reject absurdly large pastes (abuse) up front; legitimate résumés — even long
+// ones — pass and are then capped to INPUT_CHAR_CAP for the prompt below.
+const TEXT_HARD_CAP = 20_000;
+
+const roastSchema = {
+  text: vString({ trim: true, min: 40, max: TEXT_HARD_CAP }),
+  persona: vEnum(PERSONA_IDS, { optional: true, default: "recruiter" }),
+  intensity: vEnum(INTENSITY_IDS, { optional: true, default: "medium" }),
+  linkedin: vBool({ optional: true, default: false }),
+  passToken: vString({ optional: true, max: 4096 }),
+};
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let body: {
-    text?: string;
-    persona?: string;
-    intensity?: string;
-    linkedin?: boolean;
-    passToken?: string;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const parsed = await parseJsonBody(req, roastSchema);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: parsed.status });
   }
+  const body = parsed.value;
 
-  const text = (body.text ?? "").slice(0, INPUT_CHAR_CAP);
-  if (text.trim().length < 40) {
-    return NextResponse.json({ error: "too_short" }, { status: 400 });
-  }
+  // Validated to <= TEXT_HARD_CAP; cap to the prompt budget for the model.
+  const text = body.text.slice(0, INPUT_CHAR_CAP);
 
   // A server-verified Pass bypasses the per-IP roast ceiling but is metered by
   // its own allowance, enforced HERE so it can't be bypassed by editing browser
@@ -87,11 +96,7 @@ export async function POST(req: Request) {
   }
 
   const prompt =
-    buildRoastPrompt(
-      body.persona ?? "recruiter",
-      body.intensity ?? "medium",
-      !!body.linkedin,
-    ) +
+    buildRoastPrompt(body.persona, body.intensity, body.linkedin) +
     "\n\nINPUT:\n" +
     text;
 

@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { ensurePassForOrder } from "@/lib/entitlements";
 import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
+import { parseJsonBody, vString } from "@/lib/validate";
 
 export const runtime = "nodejs";
+
+// Razorpay identifiers are short opaque strings; cap them defensively.
+const verifySchema = {
+  razorpay_order_id: vString({ trim: true, max: 256 }),
+  razorpay_payment_id: vString({ trim: true, max: 256 }),
+  razorpay_signature: vString({ trim: true, max: 256 }),
+  plan: vString({ optional: true, max: 64 }),
+};
 
 // Verify a Razorpay payment signature server-side (never trust the client).
 // Signature = HMAC_SHA256(order_id + "|" + payment_id, key_secret).
@@ -12,28 +21,19 @@ export async function POST(req: Request) {
   const gate = await limitPublic(ipFrom(req), "payment_verify");
   if (!gate.allowed) return rateLimitedResponse(gate.retryAfter);
 
-  let body: {
-    razorpay_order_id?: string;
-    razorpay_payment_id?: string;
-    razorpay_signature?: string;
-    plan?: string;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 400 });
-  }
-
   const secret = process.env.RAZORPAY_KEY_SECRET;
   if (!secret) {
-    // No secret configured → demo mode, accept.
+    // No secret configured → demo mode, accept (don't require live-mode fields).
     return NextResponse.json({ ok: true, simulated: true });
   }
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return NextResponse.json({ ok: false }, { status: 400 });
+  // Live mode: every field is required and length-bounded.
+  const parsed = await parseJsonBody(req, verifySchema);
+  if (!parsed.ok) {
+    return NextResponse.json({ ok: false }, { status: parsed.status });
   }
+  const body = parsed.value;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
   const expected = createHmac("sha256", secret)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)

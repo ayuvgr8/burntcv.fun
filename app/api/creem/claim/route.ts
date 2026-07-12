@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { retrieveCheckout } from "@/lib/creem";
 import { ensurePassForOrder } from "@/lib/entitlements";
 import { ipFrom, limitAuth, recordAuthFailure, recordAuthSuccess } from "@/lib/ratelimit";
+import { parseJsonBody, vString } from "@/lib/validate";
 
 export const runtime = "nodejs";
+
+const claimSchema = { checkoutId: vString({ trim: true, max: 256 }) };
 
 // On return from Creem, confirm the checkout is paid (server-side, via the API
 // key) and act on the SERVER-verified product — never a client-sent hint:
@@ -15,12 +18,13 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const ip = ipFrom(req);
 
-  let checkoutId = "";
-  try {
-    checkoutId = (await req.json())?.checkoutId ?? "";
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const parsed = await parseJsonBody(req, claimSchema);
+  if (!parsed.ok) {
+    // Preserve the existing "missing" code for an absent id.
+    const error = parsed.error === "missing" ? "missing" : parsed.error;
+    return NextResponse.json({ error, field: parsed.field }, { status: parsed.status });
   }
+  const checkoutId = parsed.value.checkoutId;
   if (!checkoutId) {
     return NextResponse.json({ error: "missing" }, { status: 400 });
   }
