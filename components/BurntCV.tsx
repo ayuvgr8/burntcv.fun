@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { css } from "./css";
 import Landing from "./Landing";
 import FeedbackForm from "./FeedbackForm";
@@ -77,24 +84,90 @@ const PASS_PERKS_INTL = [
   "Watermark-free share cards",
 ];
 
+// Shown on the result screen so the paid tier is a concrete deliverable rather
+// than a price tag. Mirrors the sections the Glow-Up actually renders.
+const GLOWUP_INCLUDES = [
+  "A new professional summary, rewritten and ready to paste",
+  "5 of your weakest bullets rewritten — plus why each version lands",
+  "The keywords ATS filters are screening you out on",
+  "What a recruiter silently assumes, and how to reframe it",
+  "The interview questions your résumé invites — before you're asked",
+  "A timed action plan you can finish tonight",
+];
+
 // Shared mono section-label + placeholder-highlight styles for the Glow-Up.
 const GLOW_LABEL =
   "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.14em;font-weight:700;color:#0f0623;";
 const PH_STYLE =
   "background:#ffe8a3;color:#7a5a00;font-weight:700;padding:0 4px;border-radius:4px;white-space:nowrap;";
 
+// Quoted résumé text gets bolded wherever it appears, so a reader can see at a
+// glance which of THEIR words is being judged — the difference between a joke
+// and a note they can act on.
+const QUOTE_STYLE = "font-weight:800;color:#0f0623;";
+const CLOSER: Record<string, string> = { '"': '"', "“": "”", "'": "'", "‘": "’" };
+
+function isWordChar(ch: string | undefined): boolean {
+  return !!ch && /[A-Za-z0-9]/.test(ch);
+}
+
+// Hand-rolled rather than a regex: apostrophes ("don't", "VC's") share their
+// glyph with single quotes, and the lookbehind that would disambiguate isn't
+// safe on older mobile Safari.
+function emphasize(text: string, tone = QUOTE_STYLE) {
+  const s = String(text ?? "");
+  const out: ReactNode[] = [];
+  let buf = "";
+  let i = 0;
+  const flush = () => {
+    if (buf) out.push(<span key={`t${out.length}`}>{buf}</span>);
+    buf = "";
+  };
+  while (i < s.length) {
+    const close = CLOSER[s[i]];
+    // A single quote directly after a letter is an apostrophe, not an opener.
+    const apostrophe = close === "'" || close === "’";
+    if (close && !(apostrophe && isWordChar(s[i - 1]))) {
+      let end = -1;
+      for (let k = i + 1; k < s.length && k - i <= 200; k++) {
+        if (s[k] !== close) continue;
+        if (apostrophe && isWordChar(s[k + 1])) continue; // mid-word: "VC's"
+        end = k;
+        break;
+      }
+      if (end > i + 1) {
+        flush();
+        out.push(
+          <strong key={`q${out.length}`} style={css(tone)}>
+            {s.slice(i, end + 1)}
+          </strong>,
+        );
+        i = end + 1;
+        continue;
+      }
+    }
+    buf += s[i];
+    i++;
+  }
+  flush();
+  return out;
+}
+
 // Highlight [bracketed] fill-in-the-blank placeholders so they're impossible to
-// miss (and never mistaken for a real, defensible number).
+// miss (and never mistaken for a real, defensible number). Everything between
+// the placeholders still gets quote-bolding.
 function hlPlaceholders(text: string) {
-  return text.split(/(\[[^\]]+\])/g).map((part, i) =>
-    /^\[[^\]]+\]$/.test(part) ? (
-      <mark key={i} style={css(PH_STYLE)}>
-        {part}
-      </mark>
-    ) : (
-      <span key={i}>{part}</span>
-    ),
-  );
+  return String(text ?? "")
+    .split(/(\[[^\]]+\])/g)
+    .map((part, i) =>
+      /^\[[^\]]+\]$/.test(part) ? (
+        <mark key={i} style={css(PH_STYLE)}>
+          {part}
+        </mark>
+      ) : (
+        <span key={i}>{emphasize(part)}</span>
+      ),
+    );
 }
 
 // Creem checkout is a full-page redirect, so everything the post-payment
@@ -624,6 +697,12 @@ export default function BurntCV() {
       "",
       "BULLETS",
       ...glowup.rewrites.map((r) => "• " + r.after),
+      "",
+      "TO DO",
+      ...glowup.action_plan.map((a, i) => `${i + 1}. ${a.step} (${a.minutes} min)`),
+      "",
+      "ADD THESE KEYWORDS",
+      ...glowup.ats_gaps.map((k) => "• " + k),
     ].join("\n");
     navigator.clipboard?.writeText(block);
     ev("glowup_copy");
@@ -866,6 +945,10 @@ export default function BurntCV() {
   // ---- derived view values ----
   const it = intensityById(intensity);
   const pers = personaById(persona);
+  const totalPlanMinutes = (glowup?.action_plan ?? []).reduce(
+    (sum, a) => sum + (Number(a.minutes) || 0),
+    0,
+  );
   const linkedinUrlValid = /linkedin\.com\/(in|pub|profile)\//i.test(
     linkedinUrl.trim(),
   );
@@ -1439,7 +1522,7 @@ export default function BurntCV() {
                     §01 — THE COLD OPEN
                   </div>
                   <p style={css("margin:9px 0 0;font-size:19px;line-height:1.38;font-weight:600;")}>
-                    {roast.cold_open}
+                    {emphasize(roast.cold_open, "font-weight:900;color:#0f0623;")}
                   </p>
                 </div>
 
@@ -1498,22 +1581,66 @@ export default function BurntCV() {
                   >
                     §02 — THE ROAST 🔥
                   </div>
+                  <p
+                    style={css(
+                      "margin:-4px 2px 11px;font-size:12.5px;color:#6a6a6a;line-height:1.45;",
+                    )}
+                  >
+                    Every burn comes with the fix. Read the joke, then go change the line.
+                  </p>
                   <div style={css("display:flex;flex-direction:column;gap:10px;")}>
-                    {roast.roasts.map((text, i) => (
+                    {roast.roasts.map((line, i) => (
                       <div
                         key={i}
                         style={css(
-                          "display:flex;gap:12px;padding:13px;border:1px solid rgba(15,6,35,.08);border-radius:14px;background:#fff;",
+                          "border:1px solid rgba(15,6,35,.08);border-radius:14px;background:#fff;overflow:hidden;",
                         )}
                       >
-                        <div
-                          style={css(
-                            "flex:none;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#f98731,#ed3237);color:#fff;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;",
-                          )}
-                        >
-                          {String(i + 1).padStart(2, "0")}
+                        <div style={css("display:flex;gap:12px;padding:13px;")}>
+                          <div
+                            style={css(
+                              "flex:none;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#f98731,#ed3237);color:#fff;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;",
+                            )}
+                          >
+                            {String(i + 1).padStart(2, "0")}
+                          </div>
+                          <div style={css("min-width:0;")}>
+                            {line.quote && (
+                              <div
+                                style={css(
+                                  "border-left:3px solid #f98731;padding:0 0 0 9px;margin-bottom:8px;font-size:13px;font-weight:800;color:#0f0623;line-height:1.4;",
+                                )}
+                              >
+                                “{line.quote}”
+                              </div>
+                            )}
+                            <div style={css("font-size:13.5px;line-height:1.5;color:#222;")}>
+                              {emphasize(line.burn)}
+                            </div>
+                          </div>
                         </div>
-                        <div style={css("font-size:13.5px;line-height:1.5;color:#222;")}>{text}</div>
+                        {line.fix && (
+                          <div
+                            style={css(
+                              "display:flex;gap:9px;padding:11px 13px;background:rgba(31,138,91,.06);border-top:1px solid rgba(31,138,91,.14);",
+                            )}
+                          >
+                            <span
+                              style={css(
+                                "flex:none;font-size:9px;font-weight:800;letter-spacing:.1em;color:#1f8a5b;padding-top:3px;",
+                              )}
+                            >
+                              FIX
+                            </span>
+                            <div
+                              style={css(
+                                "font-size:13px;line-height:1.5;color:#14503a;font-weight:600;",
+                              )}
+                            >
+                              {hlPlaceholders(line.fix)}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1560,13 +1687,45 @@ export default function BurntCV() {
                   </div>
                 )}
 
+                {roast.strengths && roast.strengths.length > 0 && (
+                  <div>
+                    <div
+                      style={css(
+                        "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.16em;font-weight:700;color:#1f8a5b;margin-bottom:11px;",
+                      )}
+                    >
+                      §03 — WHAT&apos;S ACTUALLY WORKING ✅
+                    </div>
+                    <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                      {roast.strengths.map((s, i) => (
+                        <div
+                          key={i}
+                          style={css(
+                            "display:flex;gap:10px;padding:13px 14px;border:1px solid rgba(31,138,91,.22);background:rgba(31,138,91,.05);border-radius:14px;",
+                          )}
+                        >
+                          <span style={css("flex:none;color:#1f8a5b;font-weight:900;font-size:14px;")}>
+                            ✓
+                          </span>
+                          <div style={css("font-size:13.5px;line-height:1.5;color:#14503a;")}>
+                            {emphasize(s, "font-weight:800;color:#0d3b2a;")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={css("margin:9px 2px 0;font-size:11.5px;color:#6a6a6a;line-height:1.4;")}>
+                      Keep these when you edit. Most people delete their best line by accident.
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <div
                     style={css(
                       "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.16em;font-weight:700;color:#4e3188;margin-bottom:11px;",
                     )}
                   >
-                    §03 — CAREER TRAJECTORY
+                    §04 — CAREER TRAJECTORY
                   </div>
                   <div style={css("display:flex;flex-direction:column;gap:10px;")}>
                     <div style={css("background:#4e3188;color:#fff;border-radius:14px;padding:15px;")}>
@@ -1574,7 +1733,7 @@ export default function BurntCV() {
                         📈 WHERE YOU&apos;RE HEADED
                       </div>
                       <p style={css("margin:8px 0 0;font-size:13.5px;line-height:1.5;")}>
-                        {roast.trajectory.satirical}
+                        {emphasize(roast.trajectory.satirical, "font-weight:800;color:#ffdd00;")}
                       </p>
                     </div>
                     <div
@@ -1586,7 +1745,7 @@ export default function BurntCV() {
                         🎯 REAL TALK
                       </div>
                       <p style={css("margin:8px 0 0;font-size:13.5px;line-height:1.5;color:#222;")}>
-                        {roast.trajectory.real}
+                        {hlPlaceholders(roast.trajectory.real)}
                       </p>
                     </div>
                   </div>
@@ -1608,7 +1767,7 @@ export default function BurntCV() {
                         🌑 DARK-MODE INSIGHT
                       </div>
                       <p style={css("margin:12px 0 0;font-size:19px;line-height:1.42;font-weight:500;color:#fff;")}>
-                        {roast.dark_insight}
+                        {emphasize(roast.dark_insight, "font-weight:800;color:#f98731;")}
                       </p>
                       <div style={css("margin-top:16px;font-size:12px;color:rgba(255,255,255,.5);")}>
                         📸 The one you&apos;ll send to the group chat at 1am.
@@ -1632,8 +1791,37 @@ export default function BurntCV() {
                     VERDICT
                   </div>
                   <p style={css("margin:0;font-size:13.5px;line-height:1.5;font-weight:600;")}>
-                    {roast.verdict}
+                    {emphasize(roast.verdict, "font-weight:900;color:#0f0623;")}
                   </p>
+                </div>
+
+                {/* What the paid tier actually adds, stated plainly — the roast
+                    diagnoses, the Glow-Up hands back the edited document. */}
+                <div
+                  style={css(
+                    "border:1.5px solid rgba(78,49,136,.22);background:linear-gradient(180deg,rgba(78,49,136,.05),transparent);border-radius:16px;padding:16px 17px;",
+                  )}
+                >
+                  <div style={css(GLOW_LABEL + "color:#4e3188;margin-bottom:4px;")}>
+                    ✨ NEXT: THE GLOW-UP
+                  </div>
+                  <p style={css("margin:0 0 11px;font-size:13.5px;line-height:1.5;color:#333;")}>
+                    You know what&apos;s wrong now. The Glow-Up is the fixed version — written
+                    for you, from your own résumé, ready to paste.
+                  </p>
+                  <div style={css("display:flex;flex-direction:column;gap:7px;")}>
+                    {GLOWUP_INCLUDES.map((item) => (
+                      <div
+                        key={item}
+                        style={css(
+                          "display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#333;line-height:1.45;",
+                        )}
+                      >
+                        <span style={css("color:#1f8a5b;font-weight:800;flex:none;")}>✓</span>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div
@@ -2117,16 +2305,42 @@ export default function BurntCV() {
                       ⚡ START HERE
                     </div>
                     <p style={css("margin:0;font-size:15.5px;font-weight:700;line-height:1.45;color:#0f0623;")}>
-                      {glowup.one_thing}
+                      {hlPlaceholders(glowup.one_thing)}
                     </p>
                   </div>
+
+                  {/* Real assets already on the page — what not to edit away. */}
+                  {glowup.strengths.length > 0 && (
+                    <div>
+                      <div style={css(GLOW_LABEL + "color:#1f8a5b;margin-bottom:10px;")}>
+                        ✅ LEAD WITH THESE
+                      </div>
+                      <div style={css("display:flex;flex-direction:column;gap:8px;")}>
+                        {glowup.strengths.map((s, i) => (
+                          <div
+                            key={i}
+                            style={css(
+                              "display:flex;gap:10px;padding:12px 14px;border:1px solid rgba(31,138,91,.22);background:rgba(31,138,91,.05);border-radius:13px;",
+                            )}
+                          >
+                            <span style={css("flex:none;color:#1f8a5b;font-weight:900;")}>✓</span>
+                            <div style={css("font-size:13px;line-height:1.5;color:#14503a;")}>
+                              {emphasize(s, "font-weight:800;color:#0d3b2a;")}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* The one storyline every bullet should sell. */}
                   <div style={css("background:#4e3188;color:#fff;border-radius:16px;padding:17px;")}>
                     <div style={css("font-size:10px;letter-spacing:.14em;font-weight:700;opacity:.85;")}>
                       🧵 THE THREAD TO SELL
                     </div>
-                    <p style={css("margin:9px 0 0;font-size:15px;line-height:1.5;")}>{glowup.narrative}</p>
+                    <p style={css("margin:9px 0 0;font-size:15px;line-height:1.5;")}>
+                      {emphasize(glowup.narrative, "font-weight:800;color:#ffdd00;")}
+                    </p>
                   </div>
 
                   {/* Pasteable, rewritten professional summary. */}
@@ -2147,7 +2361,11 @@ export default function BurntCV() {
 
                   {/* Before → after rewrites, with the blanks-to-fill highlighted. */}
                   <div>
-                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>REWRITES</div>
+                    <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>REWRITES</div>
+                    <p style={css("margin:0 2px 10px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+                      Each one explains what changed, so you can apply the same move to the
+                      bullets we didn&apos;t touch.
+                    </p>
                     <div style={css("display:flex;flex-direction:column;gap:10px;")}>
                       {glowup.rewrites.map((g, i) => (
                         <div
@@ -2180,6 +2398,28 @@ export default function BurntCV() {
                               {hlPlaceholders(g.after)}
                             </div>
                           </div>
+                          {g.why && (
+                            <div
+                              style={css(
+                                "padding:11px 14px;border-top:1px solid rgba(15,6,35,.07);background:rgba(78,49,136,.04);",
+                              )}
+                            >
+                              <span
+                                style={css(
+                                  "font-size:9px;font-weight:800;letter-spacing:.1em;color:#4e3188;",
+                                )}
+                              >
+                                WHY IT LANDS
+                              </span>
+                              <div
+                                style={css(
+                                  "font-size:12.5px;color:#3d3054;line-height:1.5;margin-top:5px;",
+                                )}
+                              >
+                                {emphasize(g.why, "font-weight:800;color:#2a1f42;")}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2207,34 +2447,34 @@ export default function BurntCV() {
                           >
                             {c.text}
                           </span>
-                          <span style={css("font-size:12px;color:#7a5a63;line-height:1.4;")}>— {c.why}</span>
+                          <span style={css("font-size:12px;color:#7a5a63;line-height:1.4;")}>
+                            — {emphasize(c.why, "font-weight:800;color:#5c2f3f;")}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   {/* What a recruiter silently assumes — and the reframe. */}
-                  <GlowList label="👁️ WHAT RECRUITERS READ" items={glowup.recruiter_read} />
+                  <GlowList
+                    label="👁️ WHAT RECRUITERS READ"
+                    items={glowup.recruiter_read}
+                    note="The assumptions your résumé creates before anyone speaks to you — and how to flip each one."
+                  />
 
                   {/* Keywords an ATS filters on that are missing. */}
-                  <div>
-                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🤖 ATS BLIND SPOTS</div>
-                    <div style={css("display:flex;flex-wrap:wrap;gap:8px;")}>
-                      {glowup.ats_gaps.map((k, i) => (
-                        <span
-                          key={i}
-                          style={css(
-                            "background:rgba(78,49,136,.08);color:#4e3188;border:1px solid rgba(78,49,136,.2);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:600;line-height:1.3;",
-                          )}
-                        >
-                          {k}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <GlowList
+                    label="🤖 ATS BLIND SPOTS"
+                    items={glowup.ats_gaps}
+                    note="Words the screening software looks for and can't find on your page. Add them where they're true."
+                  />
 
                   {/* Pointed questions this résumé invites. */}
-                  <GlowList label="💣 INTERVIEW LANDMINES" items={glowup.interview_landmines} />
+                  <GlowList
+                    label="💣 INTERVIEW LANDMINES"
+                    items={glowup.interview_landmines}
+                    note="Questions this résumé invites. Prepare them now and they stop being landmines."
+                  />
 
                   {/* Where this résumé can go next + what to add. */}
                   <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
@@ -2264,6 +2504,68 @@ export default function BurntCV() {
                     </div>
                   </div>
 
+                  {/* Turns the whole report into something they can finish tonight. */}
+                  {glowup.action_plan.length > 0 && (
+                    <div
+                      style={css(
+                        "border:1.5px solid rgba(15,6,35,.12);border-radius:16px;background:#fff;padding:16px 17px;",
+                      )}
+                    >
+                      <div
+                        style={css(
+                          "display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px;",
+                        )}
+                      >
+                        <div style={css(GLOW_LABEL)}>🗓️ DO THIS TONIGHT</div>
+                        <span style={css("font-size:11px;font-weight:800;color:#4e3188;flex:none;")}>
+                          ~{totalPlanMinutes} MIN
+                        </span>
+                      </div>
+                      <p style={css("margin:0 0 12px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+                        In order. Highest impact first — stop whenever you run out of evening.
+                      </p>
+                      <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                        {glowup.action_plan.map((a, i) => (
+                          <div key={i} style={css("display:flex;gap:11px;align-items:flex-start;")}>
+                            <div
+                              style={css(
+                                "flex:none;width:23px;height:23px;border-radius:50%;background:#0f0623;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;",
+                              )}
+                            >
+                              {i + 1}
+                            </div>
+                            <div style={css("min-width:0;")}>
+                              <div
+                                style={css(
+                                  "font-size:13.5px;line-height:1.45;color:#0f0623;font-weight:700;",
+                                )}
+                              >
+                                {hlPlaceholders(a.step)}
+                              </div>
+                              {a.detail && (
+                                <div
+                                  style={css(
+                                    "margin-top:4px;font-size:12.5px;line-height:1.5;color:#5a5a5a;",
+                                  )}
+                                >
+                                  {hlPlaceholders(a.detail)}
+                                </div>
+                              )}
+                              {a.minutes > 0 && (
+                                <div
+                                  style={css(
+                                    "margin-top:5px;font-size:11px;font-weight:700;color:#9c9c9c;",
+                                  )}
+                                >
+                                  {a.minutes} min
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* Projects to go build — each one earns a bullet this résumé
                       is missing. Tap a card to expand it. */}
                   <div>
@@ -3005,10 +3307,17 @@ function ScoreArc({ before, after }: { before: number; after: number }) {
 }
 
 // A simple titled list card used for the recruiter-read and landmine sections.
-function GlowList({ label, items }: { label: string; items: string[] }) {
+function GlowList({ label, items, note }: { label: string; items: string[]; note?: string }) {
   return (
     <div>
-      <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>{label}</div>
+      <div style={css(GLOW_LABEL + (note ? "margin-bottom:4px;" : "margin-bottom:10px;"))}>
+        {label}
+      </div>
+      {note && (
+        <p style={css("margin:0 2px 10px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+          {note}
+        </p>
+      )}
       <div style={css("display:flex;flex-direction:column;gap:8px;")}>
         {items.map((it, i) => (
           <div
@@ -3018,7 +3327,7 @@ function GlowList({ label, items }: { label: string; items: string[] }) {
             )}
           >
             <span style={css("color:#4e3188;font-weight:800;flex:none;")}>›</span>
-            {it}
+            <div>{hlPlaceholders(it)}</div>
           </div>
         ))}
       </div>
