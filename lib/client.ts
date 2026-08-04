@@ -12,6 +12,8 @@ import {
   normalizeGlowup,
   fallbackRoast,
   INPUT_CHAR_CAP,
+  JD_CHAR_CAP,
+  ROLE_CHAR_CAP,
   isValidRoast,
   parseRoastJSON,
   type Glowup,
@@ -33,7 +35,11 @@ export type RoastResult =
         | "pass_exhausted"; // International Pass: all 400 are gone
     };
 
-async function callClaudeDirect(prompt: string, apiKey: string): Promise<string> {
+async function callClaudeDirect(
+  prompt: string,
+  apiKey: string,
+  maxTokens = 1024,
+): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
   let res: Response;
@@ -49,7 +55,7 @@ async function callClaudeDirect(prompt: string, apiKey: string): Promise<string>
       },
       body: JSON.stringify({
         model: BYOK_MODEL,
-        max_tokens: 1024,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -144,13 +150,18 @@ export async function requestGlowup(args: {
   apiKey: string;
   passToken: string;
   paid?: boolean; // a ₹49 top-up the user just paid for → don't spend a Pass credit
+  targetRole?: string; // the role they're applying for (collected before payment)
+  jobDescription?: string; // optional JD paste — tailors the rewrite to the posting
 }): Promise<GlowupResult> {
   const text = (args.text || "").slice(0, INPUT_CHAR_CAP);
+  const targetRole = (args.targetRole || "").trim().slice(0, ROLE_CHAR_CAP);
+  const jobDescription = (args.jobDescription || "").trim().slice(0, JD_CHAR_CAP);
   if (args.apiKey) {
     try {
       const raw = await callClaudeDirect(
-        buildGlowupPrompt() + "\n\nINPUT:\n" + text,
+        buildGlowupPrompt({ role: targetRole, jobDescription }) + "\n\nINPUT:\n" + text,
         args.apiKey,
+        3000, // Glow-Up JSON (projects + companies + roadmap) needs the headroom
       );
       return { glowup: normalizeGlowup(parseRoastJSON<Glowup>(raw)) };
     } catch {
@@ -161,7 +172,13 @@ export async function requestGlowup(args: {
     const res = await fetch("/api/glowup", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, passToken: args.passToken, paid: args.paid }),
+      body: JSON.stringify({
+        text,
+        passToken: args.passToken,
+        paid: args.paid,
+        targetRole,
+        jobDescription,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     // Pass out of Glow-Ups → tell the caller to send the user to the ₹49 paywall.
