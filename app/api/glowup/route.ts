@@ -4,7 +4,8 @@ import { checkAndIncrement, ipFrom, limitUser } from "@/lib/ratelimit";
 import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import { verifyToken, consumePassGlowup } from "@/lib/entitlements";
 import {
-  buildGlowupPrompt,
+  buildGlowupRewritePrompt,
+  buildGlowupStrategyPrompt,
   normalizeGlowup,
   INPUT_CHAR_CAP,
   parseRoastJSON,
@@ -18,6 +19,11 @@ export const maxDuration = 60;
 // Reject absurd pastes up front; legitimate input is capped for the prompt below.
 const TEXT_HARD_CAP = 20_000;
 const JOB_DESC_MAX = 5_000;
+
+// The paid deliverable — 5 rewrites with the reasoning behind each, an action
+// plan, strengths, ATS gaps, landmines. Well past the 1024 default; truncation
+// here would hand a paying user the canned fallback.
+const GLOWUP_MAX_TOKENS = 4096;
 
 const glowupSchema = {
   text: vString({ trim: true, min: 40, max: TEXT_HARD_CAP }),
@@ -74,21 +80,34 @@ export async function POST(req: Request) {
     }
   }
 
-  const prompt = buildGlowupPrompt(body.jobDescription) + "\n\nINPUT:\n" + text;
+  const input = "\n\nINPUT:\n" + text;
 
-  let glowup: Glowup | null = null;
-  try {
-    const res = await callClaude(prompt, { apiKey: "" });
+  // Both halves at once — see lib/roast.ts. Each is independently recoverable,
+  // so a failure in one still leaves the user with the other half's real work.
+  const half = async (prompt: string): Promise<Partial<Glowup> | null> => {
+    const res = await callClaude(prompt, { apiKey: "", maxTokens: GLOWUP_MAX_TOKENS });
     await recordSpend(res.model, res.usage);
-    glowup = parseRoastJSON<Glowup>(res.text);
+    return parseRoastJSON<Partial<Glowup>>(res.text);
+  };
+
+  let parts: [Partial<Glowup> | null, Partial<Glowup> | null];
+  try {
+    parts = await Promise.all([
+      half(buildGlowupRewritePrompt(body.jobDescription) + input),
+      half(buildGlowupStrategyPrompt(body.jobDescription) + input).catch((err) => {
+        console.error("[glowup] strategy half failed:", err?.message);
+        return null;
+      }),
+    ]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
     if (msg === "no_api_key") {
       return NextResponse.json({ error: "no_server_key" }, { status: 503 });
     }
-    glowup = null;
+    console.error("[glowup] rewrite half failed:", msg);
+    parts = [null, null];
   }
 
-  glowup = normalizeGlowup(glowup);
+  const glowup = normalizeGlowup({ ...(parts[0] ?? {}), ...(parts[1] ?? {}) });
   return NextResponse.json({ glowup, glowupsLeft });
 }

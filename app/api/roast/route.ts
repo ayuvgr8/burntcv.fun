@@ -14,6 +14,7 @@ import {
   fallbackRoast,
   INPUT_CHAR_CAP,
   isValidRoast,
+  normalizeRoast,
   parseRoastJSON,
   PERSONAS,
   INTENSITIES,
@@ -27,6 +28,11 @@ const INTENSITY_IDS = INTENSITIES.map((i) => i.id);
 // Reject absurdly large pastes (abuse) up front; legitimate résumés — even long
 // ones — pass and are then capped to INPUT_CHAR_CAP for the prompt below.
 const TEXT_HARD_CAP = 20_000;
+
+// The roast now carries a quote + fix per line plus strengths, so the response
+// no longer fits the 1024 default — a truncated response is unparseable JSON and
+// silently degrades to the canned fallback.
+const ROAST_MAX_TOKENS = 2048;
 
 const roastSchema = {
   text: vString({ trim: true, min: 40, max: TEXT_HARD_CAP }),
@@ -102,14 +108,14 @@ export async function POST(req: Request) {
 
   let roast: Roast | null = null;
   try {
-    let res = await callClaude(prompt, { apiKey: "" });
+    let res = await callClaude(prompt, { apiKey: "", maxTokens: ROAST_MAX_TOKENS });
     await recordSpend(res.model, res.usage);
     roast = parseRoastJSON<Roast>(res.text);
     if (!isValidRoast(roast)) {
       // Retry once with a firmer instruction (defensive parse per PRD §7.3).
       res = await callClaude(
         prompt + "\n\nReturn ONLY the JSON object. No other text.",
-        { apiKey: "" },
+        { apiKey: "", maxTokens: ROAST_MAX_TOKENS },
       );
       await recordSpend(res.model, res.usage);
       roast = parseRoastJSON<Roast>(res.text);
@@ -134,10 +140,7 @@ export async function POST(req: Request) {
 
   // Last resort so the product never hard dead-ends.
   if (!isValidRoast(roast)) roast = fallbackRoast();
-  if (!roast.trajectory) roast.trajectory = { satirical: "", real: "" };
-  if (!Array.isArray(roast.bento)) roast.bento = [];
-  if (!roast.score || typeof roast.score.value !== "number")
-    roast.score = fallbackRoast().score;
+  roast = normalizeRoast(roast);
 
   // Bump the global "résumés roasted" counter. Fire-and-forget and atomic —
   // it must never block or break the roast if Redis is down or absent.

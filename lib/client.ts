@@ -6,13 +6,15 @@
 //    our server (honors the "we never see it" promise, PRD §10).
 
 import {
-  buildGlowupPrompt,
+  buildGlowupRewritePrompt,
+  buildGlowupStrategyPrompt,
   buildRoastPrompt,
   fallbackGlowup,
   normalizeGlowup,
   fallbackRoast,
   INPUT_CHAR_CAP,
   isValidRoast,
+  normalizeRoast,
   parseRoastJSON,
   type Glowup,
   type Roast,
@@ -20,6 +22,10 @@ import {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const BYOK_MODEL = "claude-sonnet-4-6";
+// Must match the server routes — the richer roast/Glow-Up payloads overflow the
+// old 1024 ceiling, and a truncated response parses to nothing.
+const ROAST_MAX_TOKENS = 2048;
+const GLOWUP_MAX_TOKENS = 4096;
 
 export type RoastResult =
   | { ok: true; roast: Roast; passRoastsLeft?: number }
@@ -33,7 +39,11 @@ export type RoastResult =
         | "pass_exhausted"; // International Pass: all 400 are gone
     };
 
-async function callClaudeDirect(prompt: string, apiKey: string): Promise<string> {
+async function callClaudeDirect(
+  prompt: string,
+  apiKey: string,
+  maxTokens: number,
+): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
   let res: Response;
@@ -49,7 +59,7 @@ async function callClaudeDirect(prompt: string, apiKey: string): Promise<string>
       },
       body: JSON.stringify({
         model: BYOK_MODEL,
-        max_tokens: 1024,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -78,16 +88,20 @@ export async function requestRoast(args: {
         buildRoastPrompt(args.persona, args.intensity, args.linkedin) +
         "\n\nINPUT:\n" +
         text;
-      let raw = await callClaudeDirect(prompt, args.apiKey);
+      let raw = await callClaudeDirect(prompt, args.apiKey, ROAST_MAX_TOKENS);
       let roast = parseRoastJSON<Roast>(raw);
       if (!isValidRoast(roast)) {
         raw = await callClaudeDirect(
           prompt + "\n\nReturn ONLY the JSON object. No other text.",
           args.apiKey,
+          ROAST_MAX_TOKENS,
         );
         roast = parseRoastJSON<Roast>(raw);
       }
-      return { ok: true, roast: isValidRoast(roast) ? roast : fallbackRoast() };
+      return {
+        ok: true,
+        roast: normalizeRoast(isValidRoast(roast) ? roast : fallbackRoast()),
+      };
     } catch {
       return { ok: true, roast: fallbackRoast() };
     }
@@ -124,7 +138,7 @@ export async function requestRoast(args: {
     const roast = data?.roast;
     return {
       ok: true,
-      roast: isValidRoast(roast) ? roast : fallbackRoast(),
+      roast: normalizeRoast(isValidRoast(roast) ? roast : fallbackRoast()),
       passRoastsLeft:
         typeof data?.passRoastsLeft === "number" ? data.passRoastsLeft : undefined,
     };
@@ -148,11 +162,17 @@ export async function requestGlowup(args: {
   const text = (args.text || "").slice(0, INPUT_CHAR_CAP);
   if (args.apiKey) {
     try {
-      const raw = await callClaudeDirect(
-        buildGlowupPrompt() + "\n\nINPUT:\n" + text,
-        args.apiKey,
-      );
-      return { glowup: normalizeGlowup(parseRoastJSON<Glowup>(raw)) };
+      // Two halves in parallel, matching the server route (see lib/roast.ts).
+      const input = "\n\nINPUT:\n" + text;
+      const half = (prompt: string) =>
+        callClaudeDirect(prompt, args.apiKey, GLOWUP_MAX_TOKENS)
+          .then((raw) => parseRoastJSON<Partial<Glowup>>(raw))
+          .catch(() => null);
+      const [rewrite, strategy] = await Promise.all([
+        half(buildGlowupRewritePrompt() + input),
+        half(buildGlowupStrategyPrompt() + input),
+      ]);
+      return { glowup: normalizeGlowup({ ...(rewrite ?? {}), ...(strategy ?? {}) }) };
     } catch {
       return { glowup: fallbackGlowup() };
     }
