@@ -45,7 +45,6 @@ async function callClaudeDirect(
   prompt: string,
   apiKey: string,
   maxTokens: number,
-  maxTokens = 1024,
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
@@ -175,17 +174,12 @@ export async function requestGlowup(args: {
         callClaudeDirect(prompt, args.apiKey, GLOWUP_MAX_TOKENS)
           .then((raw) => parseRoastJSON<Partial<Glowup>>(raw))
           .catch(() => null);
+      const target = { role: targetRole, jobDescription };
       const [rewrite, strategy] = await Promise.all([
-        half(buildGlowupRewritePrompt() + input),
-        half(buildGlowupStrategyPrompt() + input),
+        half(buildGlowupRewritePrompt(target) + input),
+        half(buildGlowupStrategyPrompt(target) + input),
       ]);
       return { glowup: normalizeGlowup({ ...(rewrite ?? {}), ...(strategy ?? {}) }) };
-      const raw = await callClaudeDirect(
-        buildGlowupPrompt({ role: targetRole, jobDescription }) + "\n\nINPUT:\n" + text,
-        args.apiKey,
-        3000, // Glow-Up JSON (projects + companies + roadmap) needs the headroom
-      );
-      return { glowup: normalizeGlowup(parseRoastJSON<Glowup>(raw)) };
     } catch {
       return { glowup: fallbackGlowup() };
     }

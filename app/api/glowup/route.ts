@@ -90,25 +90,18 @@ export async function POST(req: Request) {
   // so a failure in one still leaves the user with the other half's real work.
   const half = async (prompt: string): Promise<Partial<Glowup> | null> => {
     const res = await callClaude(prompt, { apiKey: "", maxTokens: GLOWUP_MAX_TOKENS });
-  const prompt =
-    buildGlowupPrompt({ role: body.targetRole, jobDescription: body.jobDescription }) +
-    "\n\nINPUT:\n" +
-    text;
-
-  let glowup: Glowup | null = null;
-  try {
-    // The Glow-Up JSON is much bigger than a roast (projects, companies,
-    // roadmap) — give it headroom or the model truncates mid-object.
-    const res = await callClaude(prompt, { apiKey: "", maxTokens: 3000 });
     await recordSpend(res.model, res.usage);
     return parseRoastJSON<Partial<Glowup>>(res.text);
   };
 
+  // The role (collected before payment) and optional JD steer both halves.
+  const target = { role: body.targetRole, jobDescription: body.jobDescription };
+
   let parts: [Partial<Glowup> | null, Partial<Glowup> | null];
   try {
     parts = await Promise.all([
-      half(buildGlowupRewritePrompt(body.jobDescription) + input),
-      half(buildGlowupStrategyPrompt(body.jobDescription) + input).catch((err) => {
+      half(buildGlowupRewritePrompt(target) + input),
+      half(buildGlowupStrategyPrompt(target) + input).catch((err) => {
         console.error("[glowup] strategy half failed:", err?.message);
         return null;
       }),
