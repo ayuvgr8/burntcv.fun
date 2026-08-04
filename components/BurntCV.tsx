@@ -30,8 +30,10 @@ import {
   fallbackRoast,
   INTENSITIES,
   intensityById,
+  JD_CHAR_CAP,
   PERSONAS,
   personaById,
+  ROLE_CHAR_CAP,
   type Glowup,
   type Roast,
 } from "@/lib/roast";
@@ -53,6 +55,7 @@ type Screen =
   | "roasting"
   | "result"
   | "card"
+  | "glowup_setup"
   | "glowup"
   | "paywall"
   | "settings"
@@ -167,6 +170,35 @@ function hlPlaceholders(text: string) {
     );
 }
 
+// Creem checkout is a full-page redirect, so everything the post-payment
+// Glow-Up needs (résumé text + the role/JD collected before paying) is stashed
+// in sessionStorage on the way out and restored on the way back. Session-only:
+// it dies with the tab, honoring "never stored" (PRD §10).
+const GLOWUP_STASH = "burntcv_glowup_stash";
+type GlowupStash = { text: string; role: string; jd: string };
+function stashGlowup(s: GlowupStash) {
+  try {
+    sessionStorage.setItem(GLOWUP_STASH, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+}
+function takeGlowupStash(): GlowupStash | null {
+  try {
+    const raw = sessionStorage.getItem(GLOWUP_STASH);
+    sessionStorage.removeItem(GLOWUP_STASH);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return {
+      text: typeof s.text === "string" ? s.text : "",
+      role: typeof s.role === "string" ? s.role : "",
+      jd: typeof s.jd === "string" ? s.jd : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Rotating tile palettes for the buzzword-autopsy bento grid (collage feel).
 const BENTO_PALETTES = [
   { box: "background:#0f0623;", fg: "#fff", tag: "#f98731" },
@@ -190,6 +222,14 @@ export default function BurntCV() {
   const [roast, setRoast] = useState<Roast | null>(null);
   const [glowup, setGlowup] = useState<Glowup | null>(null);
   const [glowupLoading, setGlowupLoading] = useState(false);
+  // Collected on the Glow-Up setup screen — BEFORE any payment — so the user
+  // knows what they're buying is aimed at the job they actually want.
+  const [targetRole, setTargetRole] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  // Interactive bits of the Glow-Up result: which project card is expanded,
+  // and which stage of the skills roadmap is in view.
+  const [openProject, setOpenProject] = useState(0);
+  const [roadmapStage, setRoadmapStage] = useState<"now" | "next" | "later">("now");
   const [cardVariant, setCardVariant] = useState(0);
   const [wmOff, setWmOff] = useState(false);
   const [passUntil, setPassUntil] = useState(0);
@@ -263,13 +303,21 @@ export default function BurntCV() {
       const cid = params.get("checkout_id");
       window.history.replaceState(null, "", "/");
       if (cid) {
+        // The redirect wiped React state — recover the résumé + role/JD the
+        // user entered before paying so the Glow-Up they bought targets them.
+        const stash = takeGlowupStash();
+        if (stash) {
+          setResumeText(stash.text);
+          setTargetRole(stash.role);
+          setJobDescription(stash.jd);
+        }
         claimCreem(cid).then((res) => {
           if (res.ok && res.kind === "glowup") {
-            execGlowup(false);
+            execGlowup(false, stash ?? undefined);
             return;
           }
           if (res.ok && res.kind === "glowup_topup") {
-            execGlowup(true);
+            execGlowup(true, stash ?? undefined);
             return;
           }
           const pass = res.pass;
@@ -568,13 +616,28 @@ export default function BurntCV() {
   // Runs the actual Glow-Up call. `paid=true` means the user just paid ₹49 for
   // this one, so the server must NOT spend a Pass credit on it.
   const execGlowup = useCallback(
-    async (paid = false) => {
+    async (paid = false, over?: GlowupStash) => {
+      // `over` carries the pre-payment inputs across the Creem redirect, where
+      // React state has been reset — state alone is enough everywhere else.
+      const text = over?.text ?? resumeText;
+      const role = over?.role ?? targetRole;
+      const jd = over?.jd ?? jobDescription;
       setGlowupLoading(true);
       setGlowup(null);
+      setOpenProject(0);
+      setRoadmapStage("now");
       setMenuOpen(false);
-      ev("glowup_run");
+      // Booleans only — never the role text or the JD itself.
+      ev("glowup_run", { role: !!role.trim(), jd: !!jd.trim() });
       go("glowup");
-      const res = await requestGlowup({ text: resumeText, apiKey, passToken, paid });
+      const res = await requestGlowup({
+        text,
+        apiKey,
+        passToken,
+        paid,
+        targetRole: role,
+        jobDescription: jd,
+      });
       // Race guard: the Pass looked like it had credits but the server says it's
       // out — refund the optimistic UI and route to the ₹49 paywall.
       if (res.exhausted) {
@@ -592,19 +655,28 @@ export default function BurntCV() {
       setGlowup(res.glowup);
       setGlowupLoading(false);
     },
-    [go, resumeText, apiKey, passToken],
+    [go, resumeText, apiKey, passToken, targetRole, jobDescription],
   );
 
-  // BYOK is free; a Pass spends one of its 4 included Glow-Ups; everyone else
-  // (and Pass holders who've used their 4) pays ₹49.
+  // Tapping "The Glow-Up" always lands on the setup screen first: we ask for the
+  // role (and optionally the JD) BEFORE the paywall, so nobody pays for a
+  // rewrite aimed at the wrong job.
   const runGlowup = useCallback(() => {
+    ev("glowup_setup");
+    go("glowup_setup");
+  }, [go]);
+
+  // From the setup screen. BYOK is free; a Pass spends one of its 4 included
+  // Glow-Ups; everyone else (and Pass holders who've used their 4) pays ₹49.
+  const startGlowup = useCallback(() => {
+    if (!targetRole.trim()) return;
     if (byok || (hasPass && glowupsLeft > 0)) {
       execGlowup();
       return;
     }
     setPaywallReason("glowup");
     go("paywall");
-  }, [byok, hasPass, glowupsLeft, execGlowup, go]);
+  }, [targetRole, byok, hasPass, glowupsLeft, execGlowup, go]);
 
   // Copy a single string (used by the summary card).
   const copyText = useCallback(
@@ -708,29 +780,34 @@ export default function BurntCV() {
   const [creemLoading, setCreemLoading] = useState<null | "pass" | "glowup" | "glowup_topup">(null);
   const buyCreem = useCallback(async () => {
     setCreemLoading("pass");
+    // Leaving the page — stash the inputs so a post-payment Glow-Up (or a
+    // restored session) still has the résumé and its target.
+    stashGlowup({ text: resumeText, role: targetRole, jd: jobDescription });
     const ok = await startCreemCheckout("pass");
     if (!ok) {
       setCreemLoading(null);
       toastMsg("Couldn’t open checkout — try again in a moment.");
     }
-  }, [toastMsg]);
+  }, [toastMsg, resumeText, targetRole, jobDescription]);
   const buyCreemGlowup = useCallback(async () => {
     setCreemLoading("glowup");
+    stashGlowup({ text: resumeText, role: targetRole, jd: jobDescription });
     const ok = await startCreemCheckout("glowup");
     if (!ok) {
       setCreemLoading(null);
       toastMsg("Couldn’t open checkout — try again in a moment.");
     }
-  }, [toastMsg]);
+  }, [toastMsg, resumeText, targetRole, jobDescription]);
   // A Pass holder past their 4 included Glow-Ups → the cheaper $3.99 top-up.
   const buyCreemTopup = useCallback(async () => {
     setCreemLoading("glowup_topup");
+    stashGlowup({ text: resumeText, role: targetRole, jd: jobDescription });
     const ok = await startCreemCheckout("glowup_topup");
     if (!ok) {
       setCreemLoading(null);
       toastMsg("Couldn’t open checkout — try again in a moment.");
     }
-  }, [toastMsg]);
+  }, [toastMsg, resumeText, targetRole, jobDescription]);
 
   const restorePassFromInput = useCallback(async () => {
     const val = restoreInput.trim();
@@ -931,6 +1008,12 @@ export default function BurntCV() {
   const cardScore = roast?.score ?? fallbackRoast().score!;
   const canRemoveWatermark = hasPass || byok;
   const showWatermark = !(canRemoveWatermark && wmOff);
+
+  // Glow-Up pricing shown on the setup screen: BYOK and Pass credits run it for
+  // free, everyone else pays (₹49 in India, $4.99 abroad — $3.99 for a Pass
+  // holder who's used their included ones).
+  const glowupIncluded = byok || (hasPass && glowupsLeft > 0);
+  const glowupPriceLabel = isIN ? "₹49" : hasPass ? "$3.99" : "$4.99";
 
   const isGlowup = paywallReason === "glowup";
   const isUnhinged = paywallReason === "unhinged";
@@ -2067,6 +2150,107 @@ export default function BurntCV() {
           )}
 
           {/* ===== GLOW-UP ===== */}
+          {/* ===== GLOW-UP SETUP (role + JD, always before payment) ===== */}
+          {screen === "glowup_setup" && (
+            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+              <div>
+                <div
+                  style={css(
+                    "display:inline-flex;align-items:center;gap:7px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:11px;letter-spacing:.1em;padding:6px 12px;border-radius:999px;",
+                  )}
+                >
+                  ✨ THE GLOW-UP
+                </div>
+                <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
+                  What job are we aiming at?
+                </h2>
+                <p style={css("margin:0;font-size:14px;color:#5a5a5a;line-height:1.5;")}>
+                  A rewrite is only as good as its target. Tell me the role and
+                  every bullet gets pointed at it.
+                </p>
+              </div>
+
+              {/* Role — free text, typed by the user. No preset, no example to
+                  copy: we want the exact title on the posting they're chasing. */}
+              <div>
+                <div style={css(GLOW_LABEL + "margin-bottom:9px;")}>
+                  🎯 THE ROLE YOU&apos;RE APPLYING FOR
+                </div>
+                <input
+                  value={targetRole}
+                  autoFocus
+                  maxLength={ROLE_CHAR_CAP}
+                  onChange={(e) => setTargetRole(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") startGlowup();
+                  }}
+                  style={css(
+                    "width:100%;border:1.5px solid rgba(15,6,35,.12);border-radius:14px;padding:15px;font-size:15.5px;font-weight:600;color:#0f0623;background:#fff;",
+                  )}
+                />
+                <div
+                  style={css(
+                    "font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9c9c9c;margin-top:7px;",
+                  )}
+                >
+                  {targetRole.trim()
+                    ? "locked on · rewrites will target this title"
+                    : "type the exact job title — required"}
+                </div>
+              </div>
+
+              {/* JD — optional, but the single biggest quality lever we have. */}
+              <div>
+                <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;")}>
+                  <div style={css(GLOW_LABEL)}>📄 THE JOB DESCRIPTION</div>
+                  <span style={css("font-size:11px;font-weight:700;color:#9c9c9c;")}>optional</span>
+                </div>
+                <textarea
+                  value={jobDescription}
+                  maxLength={JD_CHAR_CAP}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  placeholder={
+                    "Paste the job description here — I’ll mirror its wording, and the ATS gaps become the exact keywords this posting screens for…"
+                  }
+                  style={css(
+                    "width:100%;min-height:130px;resize:vertical;border:1.5px solid rgba(15,6,35,.12);border-radius:14px;padding:15px;font-size:14.5px;line-height:1.55;color:#222;background:#fff;",
+                  )}
+                />
+                <div
+                  style={css(
+                    "font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9c9c9c;margin-top:-3px;",
+                  )}
+                >
+                  {jobDescription.trim()
+                    ? `${jobDescription.length} chars · tailoring to this posting`
+                    : "skip it and I'll work from the role alone"}
+                </div>
+              </div>
+
+              <button
+                onClick={startGlowup}
+                disabled={!targetRole.trim()}
+                style={css(
+                  "width:100%;border:none;padding:16px;border-radius:14px;color:#fff;font-weight:800;font-size:16px;" +
+                    (targetRole.trim()
+                      ? "cursor:pointer;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);box-shadow:0 14px 26px -12px rgba(237,50,55,.6);"
+                      : "cursor:not-allowed;background:rgba(15,6,35,.18);"),
+                )}
+              >
+                {glowupIncluded
+                  ? "Run the Glow-Up ✨"
+                  : `Continue · ${glowupPriceLabel}`}
+              </button>
+              <div style={css("text-align:center;font-size:12px;color:#9c9c9c;margin-top:-8px;")}>
+                {glowupIncluded
+                  ? byok
+                    ? "On your own key — free."
+                    : `Included in your Pass · ${glowupsLeft} left`
+                  : "Nothing is charged until the next screen."}
+              </div>
+            </div>
+          )}
+
           {screen === "glowup" && (
             <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
               <div>
@@ -2083,6 +2267,16 @@ export default function BurntCV() {
                 <p style={css("margin:0;font-size:14px;color:#5a5a5a;line-height:1.5;")}>
                   The roast found the problems. Here&apos;s the part that gets you the callback.
                 </p>
+                {targetRole.trim() && (
+                  <div
+                    style={css(
+                      "display:inline-flex;align-items:center;gap:6px;margin-top:11px;border:1.5px solid rgba(78,49,136,.25);background:rgba(78,49,136,.06);color:#4e3188;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:999px;",
+                    )}
+                  >
+                    🎯 Tailored for {targetRole.trim()}
+                    {jobDescription.trim() ? " · JD matched" : ""}
+                  </div>
+                )}
               </div>
               {glowupLoading && (
                 <div style={css("display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0;")}>
@@ -2372,6 +2566,143 @@ export default function BurntCV() {
                       </div>
                     </div>
                   )}
+                  {/* Projects to go build — each one earns a bullet this résumé
+                      is missing. Tap a card to expand it. */}
+                  <div>
+                    <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🛠 BUILD YOUR PROOF</div>
+                    <p style={css("margin:0 0 10px;font-size:12.5px;color:#5a5a5a;line-height:1.45;")}>
+                      Projects that earn the bullets you can&apos;t write yet — tap one to see the play.
+                    </p>
+                    <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                      {glowup.projects.map((p, i) => {
+                        const open = openProject === i;
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => setOpenProject(open ? -1 : i)}
+                            style={css(
+                              "cursor:pointer;border-radius:14px;overflow:hidden;background:#fff;transition:border-color .15s;" +
+                                (open
+                                  ? "border:1.5px solid rgba(78,49,136,.45);"
+                                  : "border:1px solid rgba(15,6,35,.1);"),
+                            )}
+                          >
+                            <div style={css("display:flex;align-items:center;gap:10px;padding:13px 14px;")}>
+                              <span
+                                style={css(
+                                  "flex:none;font-size:9.5px;font-weight:800;letter-spacing:.08em;border-radius:999px;padding:4px 9px;" +
+                                    (p.kind === "at-work"
+                                      ? "background:rgba(31,138,91,.1);color:#1f8a5b;"
+                                      : "background:rgba(78,49,136,.1);color:#4e3188;"),
+                                )}
+                              >
+                                {p.kind === "at-work" ? "AT WORK" : "SIDE BUILD"}
+                              </span>
+                              <span style={css("flex:1;font-size:14px;font-weight:700;color:#0f0623;line-height:1.35;")}>
+                                {p.title}
+                              </span>
+                              <span
+                                style={css(
+                                  "flex:none;color:#9c9c9c;font-size:13px;transition:transform .15s;" +
+                                    (open ? "transform:rotate(90deg);" : ""),
+                                )}
+                              >
+                                ›
+                              </span>
+                            </div>
+                            {open && (
+                              <div style={css("padding:0 14px 13px;display:flex;flex-direction:column;gap:10px;")}>
+                                <div style={css("font-size:13px;color:#333;line-height:1.5;")}>{p.what}</div>
+                                <div style={css("background:rgba(31,138,91,.06);border:1px solid rgba(31,138,91,.18);border-radius:11px;padding:10px 12px;")}>
+                                  <div style={css("font-size:9px;font-weight:800;letter-spacing:.1em;color:#1f8a5b;margin-bottom:4px;")}>
+                                    THE BULLET IT EARNS
+                                  </div>
+                                  <div style={css("font-size:12.5px;color:#0f0623;line-height:1.5;font-weight:600;")}>
+                                    {hlPlaceholders(p.bullet)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Where to actually send this résumé. */}
+                  <div>
+                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
+                    <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                      {glowup.companies.map((c, i) => (
+                        <div
+                          key={i}
+                          style={css("border:1px solid rgba(15,6,35,.1);border-radius:14px;background:#fff;padding:13px 14px;")}
+                        >
+                          <div style={css("font-size:14px;font-weight:800;color:#0f0623;line-height:1.35;")}>
+                            {c.type}
+                          </div>
+                          <div style={css("font-size:12.5px;color:#5a5a5a;line-height:1.45;margin:4px 0 9px;")}>
+                            {c.why}
+                          </div>
+                          <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
+                            {c.examples.map((e, j) => (
+                              <span
+                                key={j}
+                                style={css(
+                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;",
+                                )}
+                              >
+                                {e}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Skills / tech to master, staged Now → Next → Later. */}
+                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <div style={css(GLOW_LABEL + "margin-bottom:11px;")}>🧭 YOUR SKILL ROADMAP</div>
+                    <div style={css("display:flex;gap:6px;background:rgba(15,6,35,.05);padding:5px;border-radius:13px;margin-bottom:12px;")}>
+                      {(
+                        [
+                          ["now", "Now"],
+                          ["next", "Next 6 mo"],
+                          ["later", "The long game"],
+                        ] as const
+                      ).map(([id, label]) => (
+                        <button key={id} onClick={() => setRoadmapStage(id)} style={css(tabBtn(roadmapStage === id))}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={css("display:flex;flex-direction:column;gap:8px;")}>
+                      {glowup.roadmap[roadmapStage].map((s, i) => (
+                        <div
+                          key={roadmapStage + i}
+                          style={css("display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:#222;line-height:1.45;")}
+                        >
+                          <span
+                            style={css(
+                              "flex:none;font-weight:800;" +
+                                (roadmapStage === "now"
+                                  ? "color:#ed3237;"
+                                  : roadmapStage === "next"
+                                    ? "color:#f98731;"
+                                    : "color:#4e3188;"),
+                            )}
+                          >
+                            {roadmapStage === "now" ? "①" : roadmapStage === "next" ? "②" : "③"}
+                          </span>
+                          {s}
+                        </div>
+                      ))}
+                    </div>
+                    <p style={css("margin:11px 0 0;font-size:11.5px;color:#9c9c9c;line-height:1.4;")}>
+                      ① blocks interviews today · ② builds your edge · ③ compounds into seniority
+                    </p>
+                  </div>
 
                   {/* Assemble summary + fixed bullets into one pasteable block. */}
                   <button
@@ -2406,6 +2737,16 @@ export default function BurntCV() {
                 <p style={css("margin:0 auto;font-size:14.5px;color:#5a5a5a;line-height:1.5;max-width:300px;")}>
                   {paywallSub}
                 </p>
+                {isGlowup && targetRole.trim() && (
+                  <div
+                    style={css(
+                      "display:inline-flex;align-items:center;gap:6px;margin-top:12px;border:1.5px solid rgba(78,49,136,.25);background:rgba(78,49,136,.06);color:#4e3188;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:999px;",
+                    )}
+                  >
+                    🎯 {targetRole.trim()}
+                    {jobDescription.trim() ? " · JD attached" : ""}
+                  </div>
+                )}
               </div>
 
               {showSingle && (

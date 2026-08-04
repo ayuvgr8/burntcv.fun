@@ -66,6 +66,29 @@ export interface Roast {
 // Measured cost at this cap ≈ ₹1–1.3 per roast on Sonnet 4.6.
 export const INPUT_CHAR_CAP = 6000;
 
+// A concrete project the user should go build (or volunteer for at work) —
+// each one exists to EARN a résumé bullet they currently can't write.
+export interface GlowupProject {
+  title: string;
+  kind: "personal" | "at-work";
+  what: string; // what to build / do, concrete enough to start this week
+  bullet: string; // the résumé bullet it earns once done ([placeholders] ok)
+}
+
+// A category of company worth applying to, with real example names.
+export interface GlowupCompany {
+  type: string; // e.g. "Series B fintech scale-ups"
+  why: string; // why THIS résumé lands there
+  examples: string[]; // 2-3 recognizable names in that bucket
+}
+
+// Skills / tech to master, staged so it reads as a path, not a pile.
+export interface GlowupRoadmap {
+  now: string[]; // close these gaps before applying
+  next: string[]; // the 3-6 month edge
+  later: string[]; // the long-game differentiators
+}
+
 export interface Glowup {
   one_thing: string;
   score_before: number;
@@ -82,6 +105,9 @@ export interface Glowup {
   recruiter_read: string[];
   ats_gaps: string[];
   interview_landmines: string[];
+  projects: GlowupProject[];
+  companies: GlowupCompany[];
+  roadmap: GlowupRoadmap;
 }
 
 export const PERSONAS: Persona[] = [
@@ -210,6 +236,27 @@ function glowupPreamble(jobDescription?: string): string {
   const jd = jobDescription?.trim()
     ? `\nTARGET JOB — tailor everything to THIS role specifically:\n${jobDescription.slice(0, 2000)}\n`
     : "";
+// What the user is aiming at. The role is asked for every time (before payment);
+// the job description is optional — when present it's the strongest signal we
+// have, so the rewrite mirrors its language instead of guessing.
+export interface GlowupTarget {
+  role?: string;
+  jobDescription?: string;
+}
+export const ROLE_CHAR_CAP = 120;
+export const JD_CHAR_CAP = 5_000;
+
+export function buildGlowupPrompt(target: GlowupTarget = {}): string {
+  const role = target.role?.trim().slice(0, ROLE_CHAR_CAP) || "";
+  const desc = target.jobDescription?.trim().slice(0, 2000) || "";
+  const jd = [
+    role
+      ? `\nTARGET ROLE — this résumé is being sent for: "${role}". Every rewrite, the summary, next_moves, ats_gaps and interview_landmines must be aimed at THIS role, not the person's current one. If the résumé is a stretch for it, say so in recruiter_read and bridge the gap honestly — never invent the missing experience.\n`
+      : "",
+    desc
+      ? `\nTARGET JOB DESCRIPTION — the actual posting. Mirror its vocabulary and priorities; ats_gaps must be keywords THIS posting uses that the résumé is missing:\n${desc}\n`
+      : "",
+  ].join("");
   return `You are the BurntCV critic in HELPFUL mode. The roast is over — this is rehabilitation, and the user PAID for it, so it must feel like a genuine upgrade, not three tips. Keep a trace of the app's dry wit, but the substance has to be real: this is the part they paid for.
 Work only from the résumé text provided. Every line must reference something ACTUALLY in it — a real bullet, a real gap, a real title. No generic career advice that could apply to anyone; that's the fastest way to feel like a refund.
 INTEGRITY — non-negotiable: NEVER invent numbers, employers, job titles, tools, or achievements. Use only facts present in the input. If a real metric is in the text, use it. When a line needs a number the text doesn't have, insert a clearly-marked placeholder in square brackets — "[add %]", "[$ or #]", "[team size]", "[timeframe]" — for the user to fill with the truth. A résumé that fabricates wins gets the person caught in the interview; give them the frame, never a fake number.
@@ -235,6 +282,8 @@ export function buildGlowupStrategyPrompt(jobDescription?: string): string {
 Respond with ONLY minified JSON — no prose, no markdown fences — in exactly this shape:
 {"action_plan":[{"step":"the checklist line — an imperative naming the specific bullet or section, max 12 words","detail":"how to do it and what to write instead, quoting the résumé where useful","minutes":10}],"next_moves":{"roles":["a realistic next role","another"],"gaps":["a specific skill or experience to add to get there"]},"recruiter_read":["what a recruiter silently assumes seeing a SPECIFIC thing in this résumé, plus how to reframe it"],"ats_gaps":["\\"the exact missing keyword in double quotes\\" then a dash and why it matters, under 15 words"],"interview_landmines":["a pointed question THIS résumé invites that they should prep"]}
 COUNTS: action_plan exactly 5, ordered highest-impact first, each "minutes" a realistic integer and the whole plan doable in one sitting; next_moves.roles 2, next_moves.gaps 1-2; recruiter_read, ats_gaps, interview_landmines 2-3 each. action_plan "step" must be scannable — an imperative under 12 words that names a specific bullet, section or claim from THIS résumé ("Delete the duplicate Copilot project section", not "fix your bullets"); put every explanation in "detail" instead, max 55 words. Keep every field concrete and tied to the actual text.`;
+{"one_thing":"the single highest-leverage change, one punchy sentence","score_before":52,"score_after":81,"summary":"a 2-3 sentence professional summary, rewritten and ready to paste, truthful and specific to this person","narrative":"the one storyline every bullet should sell, one line","rewrites":[{"before":"a real weak/vague bullet quoted verbatim from the text","after":"the same bullet rewritten for impact, using [placeholders] for any number not in the source"}],"cut":[{"text":"filler to delete, quoted from the text","why":"why it hurts, one clause"}],"next_moves":{"roles":["a realistic next role","another"],"gaps":["a specific skill or experience to add to get there"]},"recruiter_read":["what a recruiter silently assumes seeing a SPECIFIC thing in this résumé, plus how to reframe it"],"ats_gaps":["a concrete keyword this résumé is missing that an ATS would filter on"],"interview_landmines":["a pointed question THIS résumé invites that they should prep"],"projects":[{"title":"a short project name","kind":"personal","what":"what to build or do, concrete enough to start this week, scoped to their actual level","bullet":"the résumé bullet this project earns once shipped, with [placeholders] for the numbers"}],"companies":[{"type":"a category of company where THIS résumé competes well (stage + industry, e.g. 'Series B fintech scale-ups')","why":"why this background lands there, one clause","examples":["2-3 real, recognizable company names in that bucket"]}],"roadmap":{"now":["a skill/tool to close BEFORE applying — the ones already blocking interviews"],"next":["the 3-6 month skills that create an edge for the target role"],"later":["the longer-game skills/tech that compound into seniority"]}}
+COUNTS: rewrites exactly 5; cut 3-4; next_moves.roles 2, next_moves.gaps 1-2; recruiter_read, ats_gaps, interview_landmines 2-3 each; projects exactly 3 — at least one "kind":"personal" (a portfolio piece they build outside work) and at least one "kind":"at-work" (a project to volunteer for INSIDE their current role, using the team/tools already in the résumé); companies 2-3; roadmap.now/next/later 2-4 items each, each a named tool, skill or technology — never vague ("SQL window functions", not "improve data skills"). Projects and roadmap must fit the target role if one is given, and every item must be plausible from where this résumé actually is today. Keep every field concrete and tied to the actual text.`;
 }
 
 export function parseRoastJSON<T = unknown>(raw: string | null | undefined): T | null {
@@ -364,6 +413,23 @@ export function normalizeGlowup(g: Partial<Glowup> | null | undefined): Glowup {
     ats_gaps: arr(g.ats_gaps, fb.ats_gaps),
     interview_landmines: arr(g.interview_landmines, fb.interview_landmines),
   };
+  g.one_thing ??= fb.one_thing;
+  g.summary ??= fb.summary;
+  g.narrative ??= fb.narrative;
+  g.cut ??= fb.cut;
+  g.next_moves ??= fb.next_moves;
+  g.recruiter_read ??= fb.recruiter_read;
+  g.ats_gaps ??= fb.ats_gaps;
+  g.interview_landmines ??= fb.interview_landmines;
+  if (!Array.isArray(g.projects) || !g.projects.length) g.projects = fb.projects;
+  if (!Array.isArray(g.companies) || !g.companies.length) g.companies = fb.companies;
+  if (!g.roadmap || !Array.isArray(g.roadmap.now)) g.roadmap = fb.roadmap;
+  g.roadmap.now ??= fb.roadmap.now;
+  g.roadmap.next ??= fb.roadmap.next;
+  g.roadmap.later ??= fb.roadmap.later;
+  if (typeof g.score_before !== "number") g.score_before = fb.score_before;
+  if (typeof g.score_after !== "number") g.score_after = fb.score_after;
+  return g;
 }
 
 export function fallbackGlowup(): Glowup {
@@ -446,5 +512,42 @@ export function fallbackGlowup(): Glowup {
       "\"Walk me through a result you're proud of\" — every bullet is a duty, so prep one story with a real number.",
       "The gap between titles invites \"what happened here?\" — have a confident one-line framing ready.",
     ],
+    projects: [
+      {
+        title: "The Ops Dashboard",
+        kind: "personal",
+        what: "Take one messy spreadsheet process you know well and rebuild it as a live dashboard (Sheets + Apps Script, or Airtable) that updates itself.",
+        bullet: "Built a self-updating ops dashboard that replaced [hrs/week] of manual reporting for [team size] people.",
+      },
+      {
+        title: "Own one metric at work",
+        kind: "at-work",
+        what: "Volunteer to own a single recurring metric your team already reports — define it, automate its collection, present it monthly.",
+        bullet: "Owned [metric] end to end — automated collection and improved it from [X] to [Y] in [timeframe].",
+      },
+      {
+        title: "The process teardown",
+        kind: "personal",
+        what: "Write a 1-page public teardown of a broken process you fixed (or would fix) — the before, the change, the number.",
+        bullet: "Published a process-improvement case study that [result — add the number].",
+      },
+    ],
+    companies: [
+      {
+        type: "Mid-size companies scaling operations",
+        why: "chaos-to-system stories land hardest where the chaos is fresh",
+        examples: ["growth-stage startups", "regional logistics firms", "D2C brands"],
+      },
+      {
+        type: "Larger firms hiring process owners",
+        why: "your coordination background reads as safe hands for an owned process",
+        examples: ["established enterprises", "consultancies", "shared-services teams"],
+      },
+    ],
+    roadmap: {
+      now: ["Excel → real formulas + pivot fluency", "one dashboard tool (Looker Studio / Power BI)"],
+      next: ["SQL basics — enough to pull your own numbers", "process mapping (SIPOC / swimlanes)"],
+      later: ["light automation (Zapier / Apps Script / Python)", "project cert that matches the target role (CAPM / CSM)"],
+    },
   };
 }

@@ -13,6 +13,8 @@ import {
   normalizeGlowup,
   fallbackRoast,
   INPUT_CHAR_CAP,
+  JD_CHAR_CAP,
+  ROLE_CHAR_CAP,
   isValidRoast,
   normalizeRoast,
   parseRoastJSON,
@@ -43,6 +45,7 @@ async function callClaudeDirect(
   prompt: string,
   apiKey: string,
   maxTokens: number,
+  maxTokens = 1024,
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
@@ -158,8 +161,12 @@ export async function requestGlowup(args: {
   apiKey: string;
   passToken: string;
   paid?: boolean; // a ₹49 top-up the user just paid for → don't spend a Pass credit
+  targetRole?: string; // the role they're applying for (collected before payment)
+  jobDescription?: string; // optional JD paste — tailors the rewrite to the posting
 }): Promise<GlowupResult> {
   const text = (args.text || "").slice(0, INPUT_CHAR_CAP);
+  const targetRole = (args.targetRole || "").trim().slice(0, ROLE_CHAR_CAP);
+  const jobDescription = (args.jobDescription || "").trim().slice(0, JD_CHAR_CAP);
   if (args.apiKey) {
     try {
       // Two halves in parallel, matching the server route (see lib/roast.ts).
@@ -173,6 +180,12 @@ export async function requestGlowup(args: {
         half(buildGlowupStrategyPrompt() + input),
       ]);
       return { glowup: normalizeGlowup({ ...(rewrite ?? {}), ...(strategy ?? {}) }) };
+      const raw = await callClaudeDirect(
+        buildGlowupPrompt({ role: targetRole, jobDescription }) + "\n\nINPUT:\n" + text,
+        args.apiKey,
+        3000, // Glow-Up JSON (projects + companies + roadmap) needs the headroom
+      );
+      return { glowup: normalizeGlowup(parseRoastJSON<Glowup>(raw)) };
     } catch {
       return { glowup: fallbackGlowup() };
     }
@@ -181,7 +194,13 @@ export async function requestGlowup(args: {
     const res = await fetch("/api/glowup", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, passToken: args.passToken, paid: args.paid }),
+      body: JSON.stringify({
+        text,
+        passToken: args.passToken,
+        paid: args.paid,
+        targetRole,
+        jobDescription,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     // Pass out of Glow-Ups → tell the caller to send the user to the ₹49 paywall.

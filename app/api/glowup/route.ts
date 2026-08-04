@@ -8,6 +8,8 @@ import {
   buildGlowupStrategyPrompt,
   normalizeGlowup,
   INPUT_CHAR_CAP,
+  JD_CHAR_CAP,
+  ROLE_CHAR_CAP,
   parseRoastJSON,
   type Glowup,
 } from "@/lib/roast";
@@ -18,7 +20,6 @@ export const maxDuration = 60;
 
 // Reject absurd pastes up front; legitimate input is capped for the prompt below.
 const TEXT_HARD_CAP = 20_000;
-const JOB_DESC_MAX = 5_000;
 
 // The paid deliverable — 5 rewrites with the reasoning behind each, an action
 // plan, strengths, ATS gaps, landmines. Well past the 1024 default; truncation
@@ -29,7 +30,10 @@ const glowupSchema = {
   text: vString({ trim: true, min: 40, max: TEXT_HARD_CAP }),
   passToken: vString({ optional: true, max: 4096 }),
   paid: vBool({ optional: true, default: false }),
-  jobDescription: vString({ optional: true, max: JOB_DESC_MAX }),
+  // The role the user is applying for (asked before payment) + the optional
+  // job description pasted alongside it.
+  targetRole: vString({ optional: true, trim: true, max: ROLE_CHAR_CAP }),
+  jobDescription: vString({ optional: true, trim: true, max: JD_CHAR_CAP }),
 };
 
 export async function POST(req: Request) {
@@ -86,6 +90,16 @@ export async function POST(req: Request) {
   // so a failure in one still leaves the user with the other half's real work.
   const half = async (prompt: string): Promise<Partial<Glowup> | null> => {
     const res = await callClaude(prompt, { apiKey: "", maxTokens: GLOWUP_MAX_TOKENS });
+  const prompt =
+    buildGlowupPrompt({ role: body.targetRole, jobDescription: body.jobDescription }) +
+    "\n\nINPUT:\n" +
+    text;
+
+  let glowup: Glowup | null = null;
+  try {
+    // The Glow-Up JSON is much bigger than a roast (projects, companies,
+    // roadmap) — give it headroom or the model truncates mid-object.
+    const res = await callClaude(prompt, { apiKey: "", maxTokens: 3000 });
     await recordSpend(res.model, res.usage);
     return parseRoastJSON<Partial<Glowup>>(res.text);
   };
