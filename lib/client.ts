@@ -8,6 +8,7 @@
 import {
   buildGlowupRewritePrompt,
   buildGlowupStrategyPrompt,
+  buildGlowupFuturePrompt,
   buildRoastPrompt,
   fallbackGlowup,
   normalizeGlowup,
@@ -168,18 +169,21 @@ export async function requestGlowup(args: {
   const jobDescription = (args.jobDescription || "").trim().slice(0, JD_CHAR_CAP);
   if (args.apiKey) {
     try {
-      // Two halves in parallel, matching the server route (see lib/roast.ts).
+      // Three parts in parallel, matching the server route (see lib/roast.ts).
       const input = "\n\nINPUT:\n" + text;
-      const half = (prompt: string) =>
+      const target = { role: targetRole, jobDescription };
+      const part = (prompt: string) =>
         callClaudeDirect(prompt, args.apiKey, GLOWUP_MAX_TOKENS)
           .then((raw) => parseRoastJSON<Partial<Glowup>>(raw))
           .catch(() => null);
-      const target = { role: targetRole, jobDescription };
-      const [rewrite, strategy] = await Promise.all([
-        half(buildGlowupRewritePrompt(target) + input),
-        half(buildGlowupStrategyPrompt(target) + input),
+      const parts = await Promise.all([
+        part(buildGlowupRewritePrompt(target) + input),
+        part(buildGlowupStrategyPrompt(target) + input),
+        part(buildGlowupFuturePrompt(target) + input),
       ]);
-      return { glowup: normalizeGlowup({ ...(rewrite ?? {}), ...(strategy ?? {}) }) };
+      return {
+        glowup: normalizeGlowup(Object.assign({}, ...parts.map((p) => p ?? {}))),
+      };
     } catch {
       return { glowup: fallbackGlowup() };
     }

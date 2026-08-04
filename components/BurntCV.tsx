@@ -2566,6 +2566,7 @@ export default function BurntCV() {
                       </div>
                     </div>
                   )}
+
                   {/* Projects to go build — each one earns a bullet this résumé
                       is missing. Tap a card to expand it. */}
                   <div>

@@ -228,11 +228,6 @@ Respond with ONLY minified JSON, no prose, no markdown fences, in exactly this s
 COUNTS: roasts exactly 4 — each "quote" copied verbatim from the text (a short fragment, under 15 words), each "burn" a real joke, each "fix" genuinely actionable. strengths exactly 2 — real, specific, quoted; if the résumé is weak, find the two least-weak true things rather than inventing praise. bento exactly 6 — each "term" quoted verbatim from the text (a buzzword, cliché, skill, or bullet fragment), each "tag" a SINGLE word (e.g. Filler, Nope, Cringe, Bless, Vague, Padding), each "emoji" one character. score.value is an integer 0-100 measuring BUZZWORD DENSITY / cliché infestation (higher = more roastable); grade is a single letter A-F (A = clean and specific, F = a buzzword crime scene); label is a witty 2-4 word grade like "Certified Corporate" or "Recovering Synergist". Keep every field punchy.`;
 }
 
-// The Glow-Up is generated in two halves that run in parallel. Written as one
-// call it takes ~50s — past the request timeout and uncomfortably close to the
-// serverless ceiling. Split, each half lands in roughly half the wall-clock, and
-// a failure in one half no longer costs the user the other.
-
 // What the user is aiming at. The role is asked for every time (before payment);
 // the job description is optional — when present it's the strongest signal we
 // have, so the rewrite mirrors its language instead of guessing.
@@ -243,15 +238,20 @@ export interface GlowupTarget {
 export const ROLE_CHAR_CAP = 120;
 export const JD_CHAR_CAP = 5_000;
 
+// The Glow-Up is generated in three parts that run in parallel. As one call it
+// takes ~50s+ — past the request timeout and uncomfortably close to the
+// serverless ceiling. Split three ways it lands in roughly a third of the
+// wall-clock, and a failure in one part no longer costs the user the others.
+// All three share this preamble so the target role/JD steers them identically.
 function glowupPreamble(target: GlowupTarget = {}): string {
   const role = target.role?.trim().slice(0, ROLE_CHAR_CAP) || "";
   const desc = target.jobDescription?.trim().slice(0, 2000) || "";
   const jd = [
     role
-      ? `\nTARGET ROLE — this résumé is being sent for: "${role}". Everything you produce must be aimed at THIS role, not the person's current one. If the résumé is a stretch for it, say so honestly and bridge the gap — never invent the missing experience.\n`
+      ? `\nTARGET ROLE — this résumé is being sent for: "${role}". Every rewrite, the summary, next_moves, ats_gaps and interview_landmines must be aimed at THIS role, not the person's current one. If the résumé is a stretch for it, say so in recruiter_read and bridge the gap honestly — never invent the missing experience.\n`
       : "",
     desc
-      ? `\nTARGET JOB DESCRIPTION — the actual posting. Mirror its vocabulary and priorities; the keywords THIS posting uses are the ones that matter:\n${desc}\n`
+      ? `\nTARGET JOB DESCRIPTION — the actual posting. Mirror its vocabulary and priorities; ats_gaps must be keywords THIS posting uses that the résumé is missing:\n${desc}\n`
       : "",
   ].join("");
   return `You are the BurntCV critic in HELPFUL mode. The roast is over — this is rehabilitation, and the user PAID for it, so it must feel like a genuine upgrade, not three tips. Keep a trace of the app's dry wit, but the substance has to be real: this is the part they paid for.
@@ -263,7 +263,7 @@ QUOTING: whenever you repeat words from the résumé inside any field, wrap them
 ${jd}`;
 }
 
-// Half 1 — the document itself: the score, the new summary, the rewrites.
+// Third 1 — the document itself: the score, the new summary, the rewrites.
 export function buildGlowupRewritePrompt(target: GlowupTarget = {}): string {
   return `${glowupPreamble(target)}
 SCORING: score_before is this résumé's GENUINE current hireability on 0-100 where higher = better (NOT a buzzword score — a clean, specific résumé scores high here). Assess honestly; do not default to a fixed number. score_after is realistic hireability once these exact fixes are applied — usually a lift of 15-40 points, never a fantasy 95+.
@@ -272,14 +272,20 @@ Respond with ONLY minified JSON — no prose, no markdown fences — in exactly 
 COUNTS: strengths 2-3; rewrites exactly 5; cut 3-4. Keep every field concrete and tied to the actual text.`;
 }
 
-// Half 2 — everything around the document: how it's read, what it's missing,
-// what to do about it tonight, and the longer game — the projects that earn
-// missing bullets, the companies worth aiming at, and the skills to master.
+// Third 2 — how the page is read today, and the checklist for fixing it tonight.
 export function buildGlowupStrategyPrompt(target: GlowupTarget = {}): string {
   return `${glowupPreamble(target)}
 Respond with ONLY minified JSON — no prose, no markdown fences — in exactly this shape:
-{"action_plan":[{"step":"the checklist line — an imperative naming the specific bullet or section, max 12 words","detail":"how to do it and what to write instead, quoting the résumé where useful","minutes":10}],"next_moves":{"roles":["a realistic next role","another"],"gaps":["a specific skill or experience to add to get there"]},"recruiter_read":["what a recruiter silently assumes seeing a SPECIFIC thing in this résumé, plus how to reframe it"],"ats_gaps":["\\"the exact missing keyword in double quotes\\" then a dash and why it matters, under 15 words"],"interview_landmines":["a pointed question THIS résumé invites that they should prep"],"projects":[{"title":"a short project name","kind":"personal","what":"what to build or do, concrete enough to start this week, scoped to their actual level","bullet":"the résumé bullet this project earns once shipped, with [placeholders] for the numbers"}],"companies":[{"type":"a category of company where THIS résumé competes well (stage + industry, e.g. 'Series B fintech scale-ups')","why":"why this background lands there, one clause","examples":["2-3 real, recognizable company names in that bucket"]}],"roadmap":{"now":["a skill/tool to close BEFORE applying — the ones already blocking interviews"],"next":["the 3-6 month skills that create an edge for the target role"],"later":["the longer-game skills/tech that compound into seniority"]}}
-COUNTS: action_plan exactly 5, ordered highest-impact first, each "minutes" a realistic integer and the whole plan doable in one sitting; next_moves.roles 2, next_moves.gaps 1-2; recruiter_read, ats_gaps, interview_landmines 2-3 each; projects exactly 3 — at least one "kind":"personal" (a portfolio piece they build outside work) and at least one "kind":"at-work" (a project to volunteer for INSIDE their current role, using the team/tools already in the résumé); companies 2-3; roadmap.now/next/later 2-4 items each, each a named tool, skill or technology — never vague ("SQL window functions", not "improve data skills"). action_plan "step" must be scannable — an imperative under 12 words that names a specific bullet, section or claim from THIS résumé ("Delete the duplicate Copilot project section", not "fix your bullets"); put every explanation in "detail" instead, max 55 words. Projects and roadmap must fit the target role if one is given, and every item must be plausible from where this résumé actually is today. Keep every field concrete and tied to the actual text.`;
+{"action_plan":[{"step":"the checklist line — an imperative naming the specific bullet or section, max 12 words","detail":"how to do it and what to write instead, quoting the résumé where useful","minutes":10}],"recruiter_read":["what a recruiter silently assumes seeing a SPECIFIC thing in this résumé, plus how to reframe it"],"ats_gaps":["\\"the exact missing keyword in double quotes\\" then a dash and why it matters, under 15 words"],"interview_landmines":["a pointed question THIS résumé invites that they should prep"]}
+COUNTS: action_plan exactly 5, ordered highest-impact first, each "minutes" a realistic integer and the whole plan doable in one sitting; recruiter_read, ats_gaps, interview_landmines 2-3 each. action_plan "step" must be scannable — an imperative under 12 words that names a specific bullet, section or claim from THIS résumé ("Delete the duplicate Copilot project section", not "fix your bullets"); put every explanation in "detail" instead, max 55 words. Keep every field concrete and tied to the actual text.`;
+}
+
+// Third 3 — where this person goes next: what to build, where to aim, what to learn.
+export function buildGlowupFuturePrompt(target: GlowupTarget = {}): string {
+  return `${glowupPreamble(target)}
+Respond with ONLY minified JSON — no prose, no markdown fences — in exactly this shape:
+{"next_moves":{"roles":["a realistic next role","another"],"gaps":["a specific skill or experience to add to get there"]},"projects":[{"title":"a short project name","kind":"personal","what":"what to build or do, concrete enough to start this week, scoped to their actual level","bullet":"the résumé bullet this project earns once shipped, with [placeholders] for the numbers"}],"companies":[{"type":"a category of company where THIS résumé competes well (stage + industry, e.g. 'Series B fintech scale-ups')","why":"why this background lands there, one clause","examples":["2-3 real, recognizable company names in that bucket"]}],"roadmap":{"now":["a skill/tool to close BEFORE applying — the ones already blocking interviews"],"next":["the 3-6 month skills that create an edge for the target role"],"later":["the longer-game skills/tech that compound into seniority"]}}
+COUNTS: next_moves.roles 2, next_moves.gaps 1-2; projects exactly 3 — at least one "kind":"personal" (a portfolio piece they build outside work) and at least one "kind":"at-work" (a project to volunteer for INSIDE their current role, using the team/tools already in the résumé); companies 2-3; roadmap.now/next/later 2-4 items each, each a named tool, skill or technology — never vague ("SQL window functions", not "improve data skills"). Projects and roadmap must fit the target role if one is given, and every item must be plausible from where this résumé actually is today. Keep every field concrete and tied to the actual text.`;
 }
 
 export function parseRoastJSON<T = unknown>(raw: string | null | undefined): T | null {
@@ -410,14 +416,13 @@ export function normalizeGlowup(g: Partial<Glowup> | null | undefined): Glowup {
     interview_landmines: arr(g.interview_landmines, fb.interview_landmines),
     projects: arr(g.projects, fb.projects),
     companies: arr(g.companies, fb.companies),
-    roadmap:
-      g.roadmap && Array.isArray(g.roadmap.now)
-        ? {
-            now: arr(g.roadmap.now, fb.roadmap.now),
-            next: arr(g.roadmap.next, fb.roadmap.next),
-            later: arr(g.roadmap.later, fb.roadmap.later),
-          }
-        : fb.roadmap,
+    roadmap: Array.isArray(g.roadmap?.now)
+      ? {
+          now: arr(g.roadmap.now, fb.roadmap.now),
+          next: arr(g.roadmap.next, fb.roadmap.next),
+          later: arr(g.roadmap.later, fb.roadmap.later),
+        }
+      : fb.roadmap,
   };
 }
 

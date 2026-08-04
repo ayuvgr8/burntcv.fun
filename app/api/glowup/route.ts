@@ -6,6 +6,7 @@ import { verifyToken, consumePassGlowup } from "@/lib/entitlements";
 import {
   buildGlowupRewritePrompt,
   buildGlowupStrategyPrompt,
+  buildGlowupFuturePrompt,
   normalizeGlowup,
   INPUT_CHAR_CAP,
   JD_CHAR_CAP,
@@ -85,36 +86,46 @@ export async function POST(req: Request) {
   }
 
   const input = "\n\nINPUT:\n" + text;
+  const target = { role: body.targetRole, jobDescription: body.jobDescription };
 
   // Both halves at once — see lib/roast.ts. Each is independently recoverable,
   // so a failure in one still leaves the user with the other half's real work.
-  const half = async (prompt: string): Promise<Partial<Glowup> | null> => {
+  const part = async (
+    label: string,
+    prompt: string,
+  ): Promise<Partial<Glowup> | null> => {
     const res = await callClaude(prompt, { apiKey: "", maxTokens: GLOWUP_MAX_TOKENS });
     await recordSpend(res.model, res.usage);
-    return parseRoastJSON<Partial<Glowup>>(res.text);
+    const parsedPart = parseRoastJSON<Partial<Glowup>>(res.text);
+    if (!parsedPart) console.error(`[glowup] ${label} returned unparseable JSON`);
+    return parsedPart;
   };
 
-  // The role (collected before payment) and optional JD steer both halves.
-  const target = { role: body.targetRole, jobDescription: body.jobDescription };
+  // The rewrite is the core deliverable, so its failure mode is the one that
+  // matters — it alone can surface no_server_key. The other two degrade to the
+  // fallback for their own sections without taking the whole report down.
+  const soft = (label: string, prompt: string) =>
+    part(label, prompt).catch((err) => {
+      console.error(`[glowup] ${label} failed:`, err?.message);
+      return null;
+    });
 
-  let parts: [Partial<Glowup> | null, Partial<Glowup> | null];
+  let parts: (Partial<Glowup> | null)[];
   try {
     parts = await Promise.all([
-      half(buildGlowupRewritePrompt(target) + input),
-      half(buildGlowupStrategyPrompt(target) + input).catch((err) => {
-        console.error("[glowup] strategy half failed:", err?.message);
-        return null;
-      }),
+      part("rewrite", buildGlowupRewritePrompt(target) + input),
+      soft("strategy", buildGlowupStrategyPrompt(target) + input),
+      soft("future", buildGlowupFuturePrompt(target) + input),
     ]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
     if (msg === "no_api_key") {
       return NextResponse.json({ error: "no_server_key" }, { status: 503 });
     }
-    console.error("[glowup] rewrite half failed:", msg);
-    parts = [null, null];
+    console.error("[glowup] rewrite part failed:", msg);
+    parts = [];
   }
 
-  const glowup = normalizeGlowup({ ...(parts[0] ?? {}), ...(parts[1] ?? {}) });
+  const glowup = normalizeGlowup(Object.assign({}, ...parts.map((p) => p ?? {})));
   return NextResponse.json({ glowup, glowupsLeft });
 }
