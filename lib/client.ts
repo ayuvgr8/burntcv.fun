@@ -22,6 +22,7 @@ import {
   type Glowup,
   type Roast,
 } from "./roast";
+import type { JobsPayload, VerifyStatus } from "./jobs";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const BYOK_MODEL = "claude-sonnet-4-6";
@@ -212,6 +213,67 @@ export async function requestGlowup(args: {
     };
   } catch {
     return { glowup: fallbackGlowup() };
+  }
+}
+
+// Live job openings for a finished Glow-Up. Deliberately separate from
+// requestGlowup: the report renders first and this fills its last section
+// afterwards, so a slow or empty jobs lookup never delays — or breaks — the
+// thing the user actually paid for.
+export async function requestJobs(args: {
+  text: string;
+  passToken: string;
+  targetRole?: string;
+}): Promise<JobsPayload> {
+  const empty = (degraded: JobsPayload["degraded"]): JobsPayload => ({
+    jobs: [],
+    degraded,
+    fetchedAt: new Date().toISOString(),
+  });
+  try {
+    const res = await fetch("/api/jobs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        text: (args.text || "").slice(0, INPUT_CHAR_CAP),
+        passToken: args.passToken,
+        targetRole: (args.targetRole || "").trim().slice(0, ROLE_CHAR_CAP),
+      }),
+    });
+    if (!res.ok) return empty(res.status === 429 ? "quota" : "no_results");
+    const data = (await res.json()) as Partial<JobsPayload>;
+    return {
+      jobs: Array.isArray(data?.jobs) ? data.jobs : [],
+      degraded: data?.degraded,
+      broadened: data?.broadened,
+      fetchedAt: data?.fetchedAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return empty("no_results");
+  }
+}
+
+// Best-effort "is this still open?" check, fired when a user expands a card.
+// Anything short of a confident answer comes back "unverifiable" — the UI says
+// so rather than implying a check we didn't manage to make.
+export async function verifyJobUrl(
+  url: string,
+  passToken: string,
+): Promise<{ status: VerifyStatus; checkedAt: string }> {
+  const unknown = { status: "unverifiable" as VerifyStatus, checkedAt: new Date().toISOString() };
+  try {
+    const res = await fetch("/api/jobs/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url, passToken }),
+    });
+    if (!res.ok) return unknown;
+    const data = await res.json();
+    return data?.status === "live" || data?.status === "closed"
+      ? { status: data.status, checkedAt: data.checkedAt ?? unknown.checkedAt }
+      : unknown;
+  } catch {
+    return unknown;
   }
 }
 

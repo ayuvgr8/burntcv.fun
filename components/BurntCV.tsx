@@ -11,6 +11,8 @@ import {
 import { css } from "./css";
 import Landing from "./Landing";
 import FeedbackForm from "./FeedbackForm";
+import JobsSection, { type JobCheck } from "./JobsSection";
+import { extractPdf, requestGlowup, requestJobs, requestRoast, verifyJobUrl } from "@/lib/client";
 import LetterReveal from "./LetterReveal";
 import { DoodleBriefcase, DoodlePlane, DoodleTarget, DoodleTrophy } from "./Doodles";
 import { extractPdf, requestGlowup, requestRoast } from "@/lib/client";
@@ -39,6 +41,7 @@ import {
   type Glowup,
   type Roast,
 } from "@/lib/roast";
+import type { Job, JobsPayload } from "@/lib/jobs";
 
 // International Pass allowance: 400 roasts across the 6 months (no daily cap),
 // after which the holder buys a new Pass. India stays on the 5-roasts/day model.
@@ -261,6 +264,12 @@ export default function BurntCV() {
   // the user has ticked off tonight.
   const [openProject, setOpenProject] = useState(0);
   const [roadmapStage, setRoadmapStage] = useState<"now" | "next" | "later">("now");
+  // Live openings, loaded after the Glow-Up renders (never blocking it) and
+  // verified one card at a time, only when the user opens one.
+  const [jobs, setJobs] = useState<JobsPayload | null>(null);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [openJob, setOpenJob] = useState(-1);
+  const [jobChecks, setJobChecks] = useState<Record<string, JobCheck>>({});
   const [doneSteps, setDoneSteps] = useState<number[]>([]);
   const toggleStep = useCallback((i: number) => {
     setDoneSteps((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]));
@@ -701,8 +710,42 @@ export default function BurntCV() {
       }
       setGlowup(res.glowup);
       setGlowupLoading(false);
+
+      // Live openings load AFTER the report is on screen. Deliberately not
+      // awaited into the render path: this call talks to third-party job APIs,
+      // and neither its latency nor its failure may touch the thing the user
+      // paid for. Worst case the section quietly says it found nothing.
+      setJobs(null);
+      setOpenJob(-1);
+      setJobChecks({});
+      setJobsLoading(true);
+      requestJobs({ text, passToken, targetRole: role })
+        .then((r) => {
+          setJobs(r);
+          ev("jobs_loaded", { count: r.jobs.length, degraded: r.degraded ?? "" });
+        })
+        .catch(() => setJobs(null))
+        .finally(() => setJobsLoading(false));
     },
     [go, resumeText, apiKey, passToken, targetRole, jobDescription],
+  );
+
+  // Expanding a card is what triggers its "still open?" check — verifying all
+  // five up front would burn ~4× the Firecrawl budget for checks most users
+  // never look at. Each URL is checked once per session.
+  const toggleJob = useCallback(
+    (i: number, job: Job) => {
+      const next = openJob === i ? -1 : i;
+      setOpenJob(next);
+      if (next < 0 || !job.verifiable || jobChecks[job.id]) return;
+      setJobChecks((m) => ({ ...m, [job.id]: { status: "checking" } }));
+      verifyJobUrl(job.applyUrl, passToken)
+        .then((r) => setJobChecks((m) => ({ ...m, [job.id]: r })))
+        .catch(() =>
+          setJobChecks((m) => ({ ...m, [job.id]: { status: "unverifiable" } })),
+        );
+    },
+    [openJob, jobChecks, passToken],
   );
 
   // Tapping "The Glow-Up" always lands on the setup screen first: we ask for the
@@ -2794,6 +2837,18 @@ export default function BurntCV() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Live openings for this résumé — see components/JobsSection.tsx.
+                      Loaded after the report renders, so neither its latency nor
+                      its failure can touch the thing the user paid for. */}
+                  <JobsSection
+                    jobs={jobs}
+                    loading={jobsLoading}
+                    openJob={openJob}
+                    checks={jobChecks}
+                    onToggle={toggleJob}
+                    onApply={(j) => ev("job_apply_click", { via: j.via })}
+                  />
 
                   {/* Skills / tech to master, staged Now → Next → Later. */}
                   <div style={css("position:relative;border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>

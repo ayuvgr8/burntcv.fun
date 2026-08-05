@@ -3,6 +3,7 @@ import { callClaude } from "@/lib/anthropic";
 import { checkAndIncrement, ipFrom, limitUser } from "@/lib/ratelimit";
 import { budgetAvailable, recordSpend } from "@/lib/spendcap";
 import { verifyToken, consumePassGlowup } from "@/lib/entitlements";
+import { markGlowupDelivered } from "@/lib/receipt";
 import {
   buildGlowupRewritePrompt,
   buildGlowupStrategyPrompt,
@@ -127,5 +128,12 @@ export async function POST(req: Request) {
   }
 
   const glowup = normalizeGlowup(Object.assign({}, ...parts.map((p) => p ?? {})));
+
+  // Receipt for the jobs column (/api/jobs). It rides along with a Glow-Up the
+  // user already paid for, so it must not cost another credit — but it also
+  // can't be an open endpoint burning our third-party job-API quota. This proves
+  // the follow-up request is for a résumé that just got a Glow-Up.
+  await markGlowupDelivered(text);
+
   return NextResponse.json({ glowup, glowupsLeft });
 }
