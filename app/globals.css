@@ -232,14 +232,50 @@ a {
   }
 }
 @media (min-width: 1280px) {
-  /* Small cards earn a third column on wide screens. */
+  /* Small cards flow into as many ~280px columns as they can FILL — two
+     items make two wide columns instead of leaving a dead third one. */
   .bcv-grid3 {
     display: grid !important;
-    grid-template-columns: 1fr 1fr 1fr !important;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
     gap: 12px !important;
     align-items: start;
   }
   .bcv-grid3 > * {
     min-width: 0;
+  }
+}
+
+/* Letter-by-letter heading reveal (LetterReveal component). */
+@keyframes bcvLetter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) rotate(3deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Decorative job-hunt doodles — desktop only, never interactive. */
+.bcv-doodle {
+  display: none;
+}
+/* Project card details: tap-to-expand on mobile, always open on desktop
+   (the accordion left a dead column next to an expanded card). */
+.bcv-proj-body {
+  display: none;
+}
+.bcv-proj-body.bcv-open {
+  display: flex;
+}
+@media (min-width: 1024px) {
+  .bcv-doodle {
+    display: block;
+  }
+  .bcv-proj-body {
+    display: flex !important;
+  }
+  .bcv-proj-chevron {
+    display: none !important;
   }
 }

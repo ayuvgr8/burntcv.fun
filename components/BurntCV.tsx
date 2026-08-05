@@ -11,6 +11,8 @@ import {
 import { css } from "./css";
 import Landing from "./Landing";
 import FeedbackForm from "./FeedbackForm";
+import LetterReveal from "./LetterReveal";
+import { DoodleBriefcase, DoodlePlane, DoodleTarget, DoodleTrophy } from "./Doodles";
 import { extractPdf, requestGlowup, requestRoast } from "@/lib/client";
 import { ev } from "@/lib/analytics";
 import {
@@ -124,8 +126,10 @@ const GLOWUP_INCLUDES = [
 // Shared mono section-label + placeholder-highlight styles for the Glow-Up.
 const GLOW_LABEL =
   "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.14em;font-weight:700;color:#0f0623;";
+// NOTE: placeholders must WRAP — long ones ("[Add: number of active users…]")
+// were clipping at the card edge under white-space:nowrap.
 const PH_STYLE =
-  "background:#ffe8a3;color:#7a5a00;font-weight:700;padding:0 4px;border-radius:4px;white-space:nowrap;";
+  "background:#ffe8a3;color:#7a5a00;font-weight:700;padding:0 4px;border-radius:4px;";
 
 // Quoted résumé text gets bolded wherever it appears, so a reader can see at a
 // glance which of THEIR words is being judged — the difference between a joke
@@ -1213,7 +1217,9 @@ export default function BurntCV() {
                   "padding:22px 18px 130px;display:flex;flex-direction:column;gap:22px;",
                 )}
               >
-                <div>
+                <div style={css("position:relative;")}>
+                  <DoodlePlane pos="top:-4px;right:40px" rotate={-10} />
+                  <DoodleBriefcase pos="top:44px;right:150px" size={52} rotate={7} />
                   <h2 style={css("font-size:28px;font-weight:900;letter-spacing:-.02em;margin:0 0 6px;")}>
                     {isLinkedIn ? "Feed me your LinkedIn" : "Feed me your résumé"}
                   </h2>
@@ -2316,7 +2322,9 @@ export default function BurntCV() {
 
           {screen === "glowup" && (
             <div className="bcv-screen" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
-              <div>
+              <div style={css("position:relative;")}>
+                <DoodlePlane pos="top:-6px;right:30px" rotate={-8} />
+                <DoodleTarget pos="top:64px;right:130px" size={54} rotate={10} />
                 <div
                   style={css(
                     "display:inline-flex;align-items:center;gap:7px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:11px;letter-spacing:.1em;padding:6px 12px;border-radius:999px;",
@@ -2325,7 +2333,11 @@ export default function BurntCV() {
                   ✨ THE GLOW-UP
                 </div>
                 <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
-                  The same flaws, now fixed.
+                  <LetterReveal
+                    text="The same flaws, now fixed."
+                    colors={["#A97CF8", "#F38CB8", "#FDCC92"]}
+                    duration={1.1}
+                  />
                 </h2>
                 <p style={css("margin:0;font-size:14px;color:#5a5a5a;line-height:1.5;")}>
                   The roast found the problems. Here&apos;s the part that gets you the callback.
@@ -2390,7 +2402,7 @@ export default function BurntCV() {
                             )}
                           >
                             <span style={css("flex:none;color:#1f8a5b;font-weight:900;")}>✓</span>
-                            <div style={css("font-size:13px;line-height:1.5;color:#14503a;")}>
+                            <div style={css("font-size:14px;line-height:1.5;color:#14503a;")}>
                               {emphasize(s, "font-weight:800;color:#0d3b2a;")}
                             </div>
                           </div>
@@ -2511,12 +2523,12 @@ export default function BurntCV() {
                         >
                           <div
                             style={css(
-                              "font-size:13px;font-weight:700;line-height:1.45;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);",
+                              "font-size:13.5px;font-weight:700;line-height:1.45;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);",
                             )}
                           >
                             {c.text}
                           </div>
-                          <div style={css("margin-top:5px;font-size:12px;color:#7a5a63;line-height:1.45;")}>
+                          <div style={css("margin-top:5px;font-size:13px;color:#7a5a63;line-height:1.5;")}>
                             {emphasize(c.why, "font-weight:800;color:#5c2f3f;")}
                           </div>
                         </div>
@@ -2529,6 +2541,7 @@ export default function BurntCV() {
                     label="👁️ WHAT RECRUITERS READ"
                     items={glowup.recruiter_read}
                     note="The assumptions your résumé creates before anyone speaks to you — and how to flip each one."
+                    accent="#4e3188"
                   />
 
                   {/* Keywords an ATS filters on that are missing. */}
@@ -2536,6 +2549,7 @@ export default function BurntCV() {
                     label="🤖 ATS BLIND SPOTS"
                     items={glowup.ats_gaps}
                     note="Words the screening software looks for and can't find on your page. Add them where they're true."
+                    accent="#0077b5"
                   />
 
                   {/* Pointed questions this résumé invites. */}
@@ -2543,6 +2557,7 @@ export default function BurntCV() {
                     label="💣 INTERVIEW LANDMINES"
                     items={glowup.interview_landmines}
                     note="Questions this résumé invites. Prepare them now and they stop being landmines."
+                    accent="#ed3237"
                   />
 
                   {/* Where this résumé can go next + what to add. */}
@@ -2606,7 +2621,7 @@ export default function BurntCV() {
                             <div style={css("min-width:0;")}>
                               <div
                                 style={css(
-                                  "font-size:13.5px;line-height:1.45;color:#0f0623;font-weight:700;",
+                                  "font-size:14.5px;line-height:1.45;color:#0f0623;font-weight:700;",
                                 )}
                               >
                                 {hlPlaceholders(a.step)}
@@ -2614,7 +2629,7 @@ export default function BurntCV() {
                               {a.detail && (
                                 <div
                                   style={css(
-                                    "margin-top:4px;font-size:12.5px;line-height:1.5;color:#5a5a5a;",
+                                    "margin-top:4px;font-size:13px;line-height:1.55;color:#5a5a5a;",
                                   )}
                                 >
                                   {hlPlaceholders(a.detail)}
@@ -2672,6 +2687,7 @@ export default function BurntCV() {
                                 {p.title}
                               </span>
                               <span
+                                className="bcv-proj-chevron"
                                 style={css(
                                   "flex:none;color:#9c9c9c;font-size:13px;transition:transform .15s;" +
                                     (open ? "transform:rotate(90deg);" : ""),
@@ -2680,59 +2696,70 @@ export default function BurntCV() {
                                 ›
                               </span>
                             </div>
-                            {open && (
-                              <div style={css("padding:0 14px 13px;display:flex;flex-direction:column;gap:10px;")}>
-                                <div style={css("font-size:13px;color:#333;line-height:1.5;")}>{p.what}</div>
-                                <div style={css("background:rgba(31,138,91,.06);border:1px solid rgba(31,138,91,.18);border-radius:11px;padding:10px 12px;")}>
-                                  <div style={css("font-size:9px;font-weight:800;letter-spacing:.1em;color:#1f8a5b;margin-bottom:4px;")}>
-                                    THE BULLET IT EARNS
-                                  </div>
-                                  <div style={css("font-size:12.5px;color:#0f0623;line-height:1.5;font-weight:600;")}>
-                                    {hlPlaceholders(p.bullet)}
-                                  </div>
+                            {/* Accordion on mobile; always open on desktop so an
+                                expanded card never sits beside a dead stub. */}
+                            <div
+                              className={"bcv-proj-body" + (open ? " bcv-open" : "")}
+                              style={css("padding:0 14px 13px;flex-direction:column;gap:10px;")}
+                            >
+                              <div style={css("font-size:13.5px;color:#333;line-height:1.5;")}>{p.what}</div>
+                              <div style={css("background:rgba(31,138,91,.06);border:1px solid rgba(31,138,91,.18);border-radius:11px;padding:10px 12px;")}>
+                                <div style={css("font-size:9px;font-weight:800;letter-spacing:.1em;color:#1f8a5b;margin-bottom:4px;")}>
+                                  THE BULLET IT EARNS
+                                </div>
+                                <div style={css("font-size:13px;color:#0f0623;line-height:1.5;font-weight:600;")}>
+                                  {hlPlaceholders(p.bullet)}
                                 </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Where to actually send this résumé. */}
-                  <div>
-                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
+                  {/* Where to actually send this résumé — collage-colored like
+                      the bento so each hunting ground pops on its own. */}
+                  <div style={css("position:relative;")}>
+                    <DoodleBriefcase pos="top:-14px;right:6px" rotate={8} />
+                    <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🏢 WHERE TO AIM IT</div>
+                    <p style={css("margin:0 2px 10px;font-size:13px;color:#6a6a6a;line-height:1.45;")}>
+                      The hunting grounds where this exact background wins — and real names to start with.
+                    </p>
                     <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
-                      {glowup.companies.map((c, i) => (
-                        <div
-                          key={i}
-                          style={css("border:1px solid rgba(15,6,35,.1);border-radius:14px;background:#fff;padding:13px 14px;")}
-                        >
-                          <div style={css("font-size:14px;font-weight:800;color:#0f0623;line-height:1.35;")}>
-                            {c.type}
+                      {glowup.companies.map((c, i) => {
+                        const pal = [
+                          { box: "background:#0f0623;", title: "#fff", why: "rgba(255,255,255,.72)", chip: "background:rgba(255,255,255,.12);color:#ffdd00;" },
+                          { box: "background:#fff;border:1.5px solid rgba(237,50,55,.25);", title: "#0f0623", why: "#5a5a5a", chip: "background:rgba(237,50,55,.08);color:#ed3237;" },
+                          { box: "background:#4e3188;", title: "#fff", why: "rgba(255,255,255,.72)", chip: "background:rgba(255,255,255,.14);color:#ffdd00;" },
+                        ][i % 3];
+                        return (
+                          <div key={i} style={css(`border-radius:16px;padding:15px 16px;${pal.box}`)}>
+                            <div style={css(`font-size:15px;font-weight:800;color:${pal.title};line-height:1.35;`)}>
+                              {c.type}
+                            </div>
+                            <div style={css(`font-size:13px;color:${pal.why};line-height:1.5;margin:5px 0 10px;`)}>
+                              {c.why}
+                            </div>
+                            <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
+                              {c.examples.map((e, j) => (
+                                <span
+                                  key={j}
+                                  style={css(`border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;${pal.chip}`)}
+                                >
+                                  {e}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                          <div style={css("font-size:12.5px;color:#5a5a5a;line-height:1.45;margin:4px 0 9px;")}>
-                            {c.why}
-                          </div>
-                          <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
-                            {c.examples.map((e, j) => (
-                              <span
-                                key={j}
-                                style={css(
-                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;",
-                                )}
-                              >
-                                {e}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Skills / tech to master, staged Now → Next → Later. */}
-                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                  <div style={css("position:relative;border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <DoodleTrophy pos="top:-30px;right:14px" rotate={-6} />
                     <div style={css(GLOW_LABEL + "margin-bottom:11px;")}>🧭 YOUR SKILL ROADMAP</div>
                     <div style={css("display:flex;gap:6px;background:rgba(15,6,35,.05);padding:5px;border-radius:13px;margin-bottom:12px;")}>
                       {(
@@ -2751,7 +2778,7 @@ export default function BurntCV() {
                       {glowup.roadmap[roadmapStage].map((s, i) => (
                         <div
                           key={roadmapStage + i}
-                          style={css("display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:#222;line-height:1.45;")}
+                          style={css("display:flex;gap:9px;align-items:flex-start;font-size:14.5px;color:#222;line-height:1.5;")}
                         >
                           <span
                             style={css(
@@ -3323,6 +3350,34 @@ export default function BurntCV() {
 function ScoreArc({ before, after }: { before: number; after: number }) {
   const [val, setVal] = useState(before);
   const [fill, setFill] = useState(false);
+  // Confetti the first time the score enters the viewport — the "reached the
+  // payoff" moment. Dynamic import keeps canvas-confetti out of the main bundle.
+  const arcRef = useRef<HTMLDivElement | null>(null);
+  const poppedRef = useRef(false);
+  useEffect(() => {
+    poppedRef.current = false;
+    const el = arcRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting) || poppedRef.current) return;
+        poppedRef.current = true;
+        io.disconnect();
+        import("canvas-confetti").then(({ default: confetti }) => {
+          const r = el.getBoundingClientRect();
+          const origin = {
+            x: (r.left + r.width / 2) / window.innerWidth,
+            y: Math.max(0.1, (r.top + r.height / 2) / window.innerHeight),
+          };
+          confetti({ particleCount: 90, spread: 75, startVelocity: 32, origin, colors: ["#f98731", "#ed3237", "#ea4c89", "#ffdd00", "#1f8a5b"] });
+          setTimeout(() => confetti({ particleCount: 45, spread: 100, startVelocity: 24, origin }), 250);
+        });
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [before, after]);
   useEffect(() => {
     setVal(before);
     setFill(false);
@@ -3346,7 +3401,7 @@ function ScoreArc({ before, after }: { before: number; after: number }) {
   const beforePct = Math.max(0, Math.min(100, before));
   const afterPct = Math.max(0, Math.min(100, after));
   return (
-    <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:17px 18px;")}>
+    <div ref={arcRef} style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:17px 18px;")}>
       <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;")}>
         <span style={css(GLOW_LABEL)}>HIREABILITY</span>
         {delta > 0 && (
@@ -3381,15 +3436,27 @@ function ScoreArc({ before, after }: { before: number; after: number }) {
   );
 }
 
-// A simple titled list card used for the recruiter-read and landmine sections.
-function GlowList({ label, items, note }: { label: string; items: string[]; note?: string }) {
+// A titled list card used for the recruiter-read / ATS / landmine sections.
+// `accent` colors the label, the marker, and a left border stripe so each
+// section is instantly tellable apart while scanning.
+function GlowList({
+  label,
+  items,
+  note,
+  accent = "#4e3188",
+}: {
+  label: string;
+  items: string[];
+  note?: string;
+  accent?: string;
+}) {
   return (
     <div>
-      <div style={css(GLOW_LABEL + (note ? "margin-bottom:4px;" : "margin-bottom:10px;"))}>
+      <div style={css(GLOW_LABEL + `color:${accent};` + (note ? "margin-bottom:4px;" : "margin-bottom:10px;"))}>
         {label}
       </div>
       {note && (
-        <p style={css("margin:0 2px 10px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+        <p style={css("margin:0 2px 10px;font-size:13px;color:#6a6a6a;line-height:1.45;")}>
           {note}
         </p>
       )}
@@ -3398,10 +3465,10 @@ function GlowList({ label, items, note }: { label: string; items: string[]; note
           <div
             key={i}
             style={css(
-              "display:flex;gap:9px;align-items:flex-start;background:#fff;border:1px solid rgba(15,6,35,.1);border-radius:12px;padding:11px 13px;font-size:13px;color:#333;line-height:1.45;",
+              `display:flex;gap:9px;align-items:flex-start;background:#fff;border:1px solid rgba(15,6,35,.1);border-left:4px solid ${accent};border-radius:12px;padding:12px 14px;font-size:14px;color:#333;line-height:1.5;`,
             )}
           >
-            <span style={css("color:#4e3188;font-weight:800;flex:none;")}>›</span>
+            <span style={css(`color:${accent};font-weight:800;flex:none;`)}>›</span>
             <div>{hlPlaceholders(it)}</div>
           </div>
         ))}
