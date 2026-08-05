@@ -229,15 +229,16 @@ export default function Landing({
         <div style={css("display:flex;align-items:center;gap:18px;")}>
           <button
             onClick={onRoast}
+            className="bcv-navcta"
             style={css(
-              "border:none;cursor:pointer;background:#0f0623;color:#fff;font-weight:700;font-size:14px;padding:11px 18px;border-radius:11px;",
+              "border:none;cursor:pointer;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:14px;padding:11px 19px;border-radius:999px;box-shadow:0 8px 18px -8px rgba(237,50,55,.55);",
             )}
           >
             <LetterReveal
-              text="Roast my résumé"
-              colors={["#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7"]}
+              text="Roast my résumé 🔥"
+              colors={["#fff"]}
               delay={0.35}
-              duration={1.6}
+              duration={0.9}
             />
           </button>
         </div>
