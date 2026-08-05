@@ -186,6 +186,23 @@ a {
     margin-left: auto !important;
     margin-right: auto !important;
   }
+  /* Input screen: the docked CTA joins the flow right under the columns
+     instead of floating at the frame bottom, and the textarea grows so the
+     entry column fills the height the pickers take. */
+  .bcv-dock-inline {
+    position: static !important;
+    background: none !important;
+    padding: 4px 48px 30px !important;
+  }
+  .bcv-tight-bottom {
+    padding-bottom: 10px !important;
+  }
+  .bcv-col textarea {
+    min-height: 320px !important;
+  }
+  .bcv-narrow textarea {
+    min-height: 220px !important;
+  }
   .bcv-grid2 {
     display: grid !important;
     grid-template-columns: 1fr 1fr;

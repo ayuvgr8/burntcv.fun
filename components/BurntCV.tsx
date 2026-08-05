@@ -1171,7 +1171,7 @@ export default function BurntCV() {
           {screen === "input" && (
             <>
               <div
-                className="bcv-screen"
+                className="bcv-screen bcv-tight-bottom"
                 style={css(
                   "padding:22px 18px 130px;display:flex;flex-direction:column;gap:22px;",
                 )}
@@ -1442,7 +1442,7 @@ export default function BurntCV() {
                 </div>
               </div>
               <div
-                className="bcv-dock"
+                className="bcv-dock bcv-dock-inline"
                 style={css(
                   "position:absolute;bottom:0;left:0;right:0;padding:14px 18px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(to top,#f7f6f4 72%,rgba(247,246,244,0));",
                 )}
