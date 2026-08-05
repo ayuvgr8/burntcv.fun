@@ -15,7 +15,6 @@ import JobsSection, { type JobCheck } from "./JobsSection";
 import { extractPdf, requestGlowup, requestJobs, requestRoast, verifyJobUrl } from "@/lib/client";
 import LetterReveal from "./LetterReveal";
 import { DoodleBriefcase, DoodlePlane, DoodleTarget, DoodleTrophy } from "./Doodles";
-import { extractPdf, requestGlowup, requestRoast } from "@/lib/client";
 import { ev } from "@/lib/analytics";
 import {
   purchase,
