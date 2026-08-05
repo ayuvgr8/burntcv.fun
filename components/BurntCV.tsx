@@ -2658,7 +2658,7 @@ export default function BurntCV() {
                     <p style={css("margin:0 0 10px;font-size:12.5px;color:#5a5a5a;line-height:1.45;")}>
                       Projects that earn the bullets you can&apos;t write yet — tap one to see the play.
                     </p>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2 bcv-nospan" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.projects.map((p, i) => {
                         const open = openProject === i;
                         return (
@@ -2718,42 +2718,35 @@ export default function BurntCV() {
                     </div>
                   </div>
 
-                  {/* Where to actually send this résumé — collage-colored like
-                      the bento so each hunting ground pops on its own. */}
-                  <div style={css("position:relative;")}>
-                    <DoodleBriefcase pos="top:-14px;right:6px" rotate={8} />
-                    <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🏢 WHERE TO AIM IT</div>
-                    <p style={css("margin:0 2px 10px;font-size:13px;color:#6a6a6a;line-height:1.45;")}>
-                      The hunting grounds where this exact background wins — and real names to start with.
-                    </p>
+                  {/* Where to actually send this résumé. */}
+                  <div>
+                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
                     <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
-                      {glowup.companies.map((c, i) => {
-                        const pal = [
-                          { box: "background:#0f0623;", title: "#fff", why: "rgba(255,255,255,.72)", chip: "background:rgba(255,255,255,.12);color:#ffdd00;" },
-                          { box: "background:#fff;border:1.5px solid rgba(237,50,55,.25);", title: "#0f0623", why: "#5a5a5a", chip: "background:rgba(237,50,55,.08);color:#ed3237;" },
-                          { box: "background:#4e3188;", title: "#fff", why: "rgba(255,255,255,.72)", chip: "background:rgba(255,255,255,.14);color:#ffdd00;" },
-                        ][i % 3];
-                        return (
-                          <div key={i} style={css(`border-radius:16px;padding:15px 16px;${pal.box}`)}>
-                            <div style={css(`font-size:15px;font-weight:800;color:${pal.title};line-height:1.35;`)}>
-                              {c.type}
-                            </div>
-                            <div style={css(`font-size:13px;color:${pal.why};line-height:1.5;margin:5px 0 10px;`)}>
-                              {c.why}
-                            </div>
-                            <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
-                              {c.examples.map((e, j) => (
-                                <span
-                                  key={j}
-                                  style={css(`border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;${pal.chip}`)}
-                                >
-                                  {e}
-                                </span>
-                              ))}
-                            </div>
+                      {glowup.companies.map((c, i) => (
+                        <div
+                          key={i}
+                          style={css("border:1px solid rgba(15,6,35,.1);border-radius:14px;background:#fff;padding:13px 14px;")}
+                        >
+                          <div style={css("font-size:15px;font-weight:800;color:#0f0623;line-height:1.35;")}>
+                            {c.type}
                           </div>
-                        );
-                      })}
+                          <div style={css("font-size:13px;color:#5a5a5a;line-height:1.5;margin:4px 0 9px;")}>
+                            {c.why}
+                          </div>
+                          <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
+                            {c.examples.map((e, j) => (
+                              <span
+                                key={j}
+                                style={css(
+                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;",
+                                )}
+                              >
+                                {e}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 

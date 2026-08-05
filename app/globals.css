@@ -272,10 +272,4 @@ a {
   .bcv-doodle {
     display: block;
   }
-  .bcv-proj-body {
-    display: flex !important;
-  }
-  .bcv-proj-chevron {
-    display: none !important;
-  }
 }
