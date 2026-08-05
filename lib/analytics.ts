@@ -11,6 +11,7 @@ export function ev(
     | "card_download"
     | "card_share"
     | "caption_copy"
+    | "sample_loaded" // tried the canned sample résumé from the input screen
     | "glowup_setup" // opened the role / JD screen (the step before paying)
     | "glowup_run"
     | "glowup_copy"
