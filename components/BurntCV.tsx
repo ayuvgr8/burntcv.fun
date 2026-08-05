@@ -257,9 +257,14 @@ export default function BurntCV() {
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   // Interactive bits of the Glow-Up result: which project card is expanded,
-  // and which stage of the skills roadmap is in view.
+  // which stage of the skills roadmap is in view, and which action-plan steps
+  // the user has ticked off tonight.
   const [openProject, setOpenProject] = useState(0);
   const [roadmapStage, setRoadmapStage] = useState<"now" | "next" | "later">("now");
+  const [doneSteps, setDoneSteps] = useState<number[]>([]);
+  const toggleStep = useCallback((i: number) => {
+    setDoneSteps((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]));
+  }, []);
   const [cardVariant, setCardVariant] = useState(0);
   const [wmOff, setWmOff] = useState(false);
   const [passUntil, setPassUntil] = useState(0);
@@ -667,6 +672,7 @@ export default function BurntCV() {
       setGlowup(null);
       setOpenProject(0);
       setRoadmapStage("now");
+      setDoneSteps([]);
       setMenuOpen(false);
       // Booleans only — never the role text or the JD itself.
       ev("glowup_run", { role: !!role.trim(), jd: !!jd.trim() });
@@ -2510,7 +2516,9 @@ export default function BurntCV() {
                   {/* Filler to delete, with the reason it hurts. */}
                   <div>
                     <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>✂️ CUT THESE</div>
-                    <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:8px;")}>
+                    {/* 2-col only: cut lists run 3-4 items, and a 3-col grid
+                        strands the 4th card across a mostly-dead row. */}
+                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
                       {glowup.cut.map((c, i) => (
                         // Stacked, not side-by-side: the model quotes whole
                         // bullets, and a non-wrapping quote next to a squeezed
@@ -2561,14 +2569,15 @@ export default function BurntCV() {
                   />
 
                   {/* Where this résumé can go next + what to add. */}
-                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                  <div style={css("position:relative;border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <DoodlePlane pos="top:-24px;right:12px" size={58} rotate={12} />
                     <div style={css(GLOW_LABEL + "margin-bottom:11px;")}>🚀 WHERE THIS GOES NEXT</div>
                     <div style={css("display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;")}>
                       {glowup.next_moves.roles.map((r, i) => (
                         <span
                           key={i}
                           style={css(
-                            "background:#0f0623;color:#fff;border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;",
+                            "background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:800;box-shadow:0 8px 16px -10px rgba(237,50,55,.6);",
                           )}
                         >
                           {r}
@@ -2579,7 +2588,7 @@ export default function BurntCV() {
                       {glowup.next_moves.gaps.map((g, i) => (
                         <div
                           key={i}
-                          style={css("display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#333;line-height:1.45;")}
+                          style={css("display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:#333;line-height:1.5;")}
                         >
                           <span style={css("color:#1f8a5b;font-weight:800;flex:none;")}>+</span>
                           {g}
@@ -2601,27 +2610,40 @@ export default function BurntCV() {
                         )}
                       >
                         <div style={css(GLOW_LABEL)}>🗓️ DO THIS TONIGHT</div>
-                        <span style={css("font-size:11px;font-weight:800;color:#4e3188;flex:none;")}>
-                          ~{totalPlanMinutes} MIN
+                        <span style={css("font-size:11px;font-weight:800;flex:none;" + (doneSteps.length ? "color:#1f8a5b;" : "color:#4e3188;"))}>
+                          {doneSteps.length
+                            ? `${doneSteps.length}/${glowup.action_plan.length} DONE 🎉`
+                            : `~${totalPlanMinutes} MIN`}
                         </span>
                       </div>
                       <p style={css("margin:0 0 12px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
-                        In order. Highest impact first — stop whenever you run out of evening.
+                        In order, highest impact first — tap a step to tick it off.
                       </p>
-                      <div style={css("display:flex;flex-direction:column;gap:9px;")}>
-                        {glowup.action_plan.map((a, i) => (
-                          <div key={i} style={css("display:flex;gap:11px;align-items:flex-start;")}>
+                      <div style={css("display:flex;flex-direction:column;gap:6px;")}>
+                        {glowup.action_plan.map((a, i) => {
+                          const done = doneSteps.includes(i);
+                          return (
+                          <div
+                            key={i}
+                            className="bcv-step"
+                            onClick={() => toggleStep(i)}
+                            style={css("display:flex;gap:11px;align-items:flex-start;padding:6px 8px;margin:0 -8px;" + (done ? "opacity:.55;" : ""))}
+                          >
                             <div
                               style={css(
-                                "flex:none;width:23px;height:23px;border-radius:50%;background:#0f0623;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;",
+                                "flex:none;width:23px;height:23px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;transition:background .15s;" +
+                                  (done ? "background:#1f8a5b;" : "background:#0f0623;"),
                               )}
                             >
-                              {i + 1}
+                              {done ? "✓" : i + 1}
                             </div>
                             <div style={css("min-width:0;")}>
                               <div
                                 style={css(
-                                  "font-size:14.5px;line-height:1.45;color:#0f0623;font-weight:700;",
+                                  "font-size:14.5px;line-height:1.45;font-weight:700;" +
+                                    (done
+                                      ? "color:#5a5a5a;text-decoration:line-through;text-decoration-color:rgba(31,138,91,.6);"
+                                      : "color:#0f0623;"),
                                 )}
                               >
                                 {hlPlaceholders(a.step)}
@@ -2646,7 +2668,8 @@ export default function BurntCV() {
                               )}
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

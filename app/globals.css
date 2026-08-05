@@ -273,3 +273,21 @@ a {
     display: block;
   }
 }
+
+/* Landing nav CTA: lift on hover (inline styles can't do :hover). */
+.bcv-navcta {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bcv-navcta:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 12px 24px -10px rgba(237, 50, 55, 0.65);
+}
+/* Do-This-Tonight steps are tappable checklists. */
+.bcv-step {
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.bcv-step:hover {
+  background: rgba(78, 49, 136, 0.05);
+}
