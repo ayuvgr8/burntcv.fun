@@ -91,26 +91,98 @@ a {
 
 /* ===== Responsive app frame =====
    The app is designed phone-first (480px column). On desktop the frame widens
-   and dense card lists flow into a 2/3-column grid instead of one skinny,
-   stretched column. Inline styles carry the base look, so the desktop
-   overrides need !important to win. */
+   into a real page layout: hero cards pair up, dense lists flow into grids,
+   the input screen splits into two columns, and form screens keep a centered
+   measure. Inline styles carry the base look, so overrides need !important.
+   Every wrapper class below is display:contents on mobile — zero effect. */
 .bcv-frame,
 .bcv-frame * {
   overflow-wrap: break-word; /* long model quotes must wrap, never clip */
 }
+.bcv-hero,
+.bcv-cols,
+.bcv-col,
+.bcv-cta,
+.bcv-offers {
+  display: contents;
+}
 @media (min-width: 1024px) {
   .bcv-frame {
-    max-width: 860px !important;
+    max-width: 1080px !important;
+  }
+  .bcv-topbar {
+    padding: 14px 28px !important;
   }
   .bcv-screen {
-    padding-left: 44px !important;
-    padding-right: 44px !important;
+    padding-left: 48px !important;
+    padding-right: 48px !important;
+    padding-top: 32px !important;
+  }
+  .bcv-screen h2 {
+    font-size: 30px !important;
   }
   /* Center narrow, form-like screens (setup, paywall, settings…) so inputs
      and pay cards keep a readable measure inside the wide frame. */
   .bcv-narrow > * {
     width: 100%;
-    max-width: 640px;
+    max-width: 680px;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  /* Paired hero cards (score + start-here, cold open + buzzword meter). */
+  .bcv-hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: stretch;
+  }
+  .bcv-hero > * {
+    min-width: 0;
+  }
+  /* Input screen: résumé entry on the left, burn/roaster pickers right. */
+  .bcv-cols {
+    display: grid;
+    grid-template-columns: 1.08fr 0.92fr;
+    gap: 30px;
+    align-items: start;
+  }
+  .bcv-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+  }
+  /* Side-by-side CTA pair at the end of the Glow-Up. */
+  .bcv-cta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  /* Paywall offers side by side, wider than the 680px form measure. */
+  .bcv-narrow > .bcv-offers {
+    max-width: 860px;
+  }
+  .bcv-offers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .bcv-offers > * {
+    min-width: 0;
+    margin: 0 !important;
+  }
+  .bcv-offers > *:only-child {
+    grid-column: 1 / -1;
+  }
+  /* Bottom action docks: don't stretch a phone button across the page. */
+  .bcv-dock {
+    padding-left: 48px !important;
+    padding-right: 48px !important;
+  }
+  .bcv-dock > * {
+    width: 100%;
+    max-width: 560px;
     margin-left: auto !important;
     margin-right: auto !important;
   }
@@ -123,7 +195,16 @@ a {
   .bcv-grid2 > * {
     min-width: 0;
   }
+}
+@media (min-width: 1280px) {
+  /* Small cards earn a third column on wide screens. */
   .bcv-grid3 {
+    display: grid !important;
     grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 12px !important;
+    align-items: start;
+  }
+  .bcv-grid3 > * {
+    min-width: 0;
   }
 }

@@ -1125,6 +1125,7 @@ export default function BurntCV() {
       >
         {/* TOP BAR */}
         <div
+          className="bcv-topbar"
           style={css(
             "position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:13px 14px;background:rgba(247,246,244,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(15,6,35,.07);",
           )}
@@ -1170,7 +1171,7 @@ export default function BurntCV() {
           {screen === "input" && (
             <>
               <div
-                className="bcv-screen bcv-narrow"
+                className="bcv-screen"
                 style={css(
                   "padding:22px 18px 130px;display:flex;flex-direction:column;gap:22px;",
                 )}
@@ -1186,6 +1187,9 @@ export default function BurntCV() {
                   </p>
                 </div>
 
+                {/* Desktop: résumé entry left, pickers right (inert on mobile). */}
+                <div className="bcv-cols">
+                <div className="bcv-col">
                 <div
                   style={css(
                     "display:flex;gap:6px;background:rgba(15,6,35,.05);padding:5px;border-radius:13px;",
@@ -1346,7 +1350,9 @@ export default function BurntCV() {
                       : resumeText.length + " chars · ready"}
                   </span>
                 </div>
+                </div>
 
+                <div className="bcv-col">
                 <div ref={intensityRef} style={css("scroll-margin-top:70px;")}>
                   <div
                     style={css(
@@ -1432,8 +1438,11 @@ export default function BurntCV() {
                     })}
                   </div>
                 </div>
+                </div>
+                </div>
               </div>
               <div
+                className="bcv-dock"
                 style={css(
                   "position:absolute;bottom:0;left:0;right:0;padding:14px 18px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(to top,#f7f6f4 72%,rgba(247,246,244,0));",
                 )}
@@ -1512,6 +1521,8 @@ export default function BurntCV() {
                   </span>
                 </div>
 
+                {/* Desktop: cold open + buzzword meter side by side. */}
+                <div className="bcv-hero">
                 <div
                   style={css(
                     "border-left:4px solid #f98731;background:rgba(249,135,49,.07);border-radius:0 14px 14px 0;padding:15px 17px;",
@@ -1575,6 +1586,7 @@ export default function BurntCV() {
                     </div>
                   </div>
                 )}
+                </div>
 
                 <div>
                   <div
@@ -1699,7 +1711,7 @@ export default function BurntCV() {
                     >
                       §03 — WHAT&apos;S ACTUALLY WORKING ✅
                     </div>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {roast.strengths.map((s, i) => (
                         <div
                           key={i}
@@ -1836,6 +1848,7 @@ export default function BurntCV() {
                 </div>
               </div>
               <div
+                className="bcv-dock"
                 style={css(
                   "position:absolute;bottom:0;left:0;right:0;padding:13px 18px calc(15px + env(safe-area-inset-bottom));background:linear-gradient(to top,#f7f6f4 72%,rgba(247,246,244,0));display:flex;flex-direction:column;gap:9px;",
                 )}
@@ -2295,6 +2308,8 @@ export default function BurntCV() {
               )}
               {glowup && (
                 <>
+                  {/* Desktop: score + start-here pair up as the hero row. */}
+                  <div className="bcv-hero">
                   {/* Hireability arc — the "was X, now Y" payoff, animated up. */}
                   <ScoreArc before={glowup.score_before} after={glowup.score_after} />
 
@@ -2311,6 +2326,7 @@ export default function BurntCV() {
                       {hlPlaceholders(glowup.one_thing)}
                     </p>
                   </div>
+                  </div>
 
                   {/* Real assets already on the page — what not to edit away. */}
                   {glowup.strengths.length > 0 && (
@@ -2318,7 +2334,7 @@ export default function BurntCV() {
                       <div style={css(GLOW_LABEL + "color:#1f8a5b;margin-bottom:10px;")}>
                         ✅ LEAD WITH THESE
                       </div>
-                      <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
+                      <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:8px;")}>
                         {glowup.strengths.map((s, i) => (
                           <div
                             key={i}
@@ -2435,7 +2451,7 @@ export default function BurntCV() {
                   {/* Filler to delete, with the reason it hurts. */}
                   <div>
                     <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>✂️ CUT THESE</div>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
+                    <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:8px;")}>
                       {glowup.cut.map((c, i) => (
                         // Stacked, not side-by-side: the model quotes whole
                         // bullets, and a non-wrapping quote next to a squeezed
@@ -2639,7 +2655,7 @@ export default function BurntCV() {
                   {/* Where to actually send this résumé. */}
                   <div>
                     <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.companies.map((c, i) => (
                         <div
                           key={i}
@@ -2712,6 +2728,7 @@ export default function BurntCV() {
                   </div>
 
                   {/* Assemble summary + fixed bullets into one pasteable block. */}
+                  <div className="bcv-cta">
                   <button
                     onClick={copyGlowup}
                     style={css(
@@ -2728,6 +2745,7 @@ export default function BurntCV() {
                   >
                     Back to the share card 🔥
                   </button>
+                  </div>
                 </>
               )}
             </div>
@@ -2756,6 +2774,8 @@ export default function BurntCV() {
                 )}
               </div>
 
+              {/* Desktop: offer cards sit side by side (inert on mobile). */}
+              <div className="bcv-offers">
               {showSingle && (
                 <div
                   style={css(
@@ -2937,6 +2957,7 @@ export default function BurntCV() {
                   </div>
                 </div>
               )}
+              </div>
 
               <div style={css("display:flex;align-items:center;gap:12px;color:#9c9c9c;font-size:12px;font-weight:600;")}>
                 <span style={css("flex:1;height:1px;background:rgba(15,6,35,.1);")}></span>OR
@@ -3325,7 +3346,7 @@ function GlowList({ label, items, note }: { label: string; items: string[]; note
           {note}
         </p>
       )}
-      <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
+      <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:8px;")}>
         {items.map((it, i) => (
           <div
             key={i}
