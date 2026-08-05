@@ -35,6 +35,13 @@ share and a screenshot that gets you cancelled.
 
 - **Free / Pro** → `/api/roast` & `/api/glowup` use the platform `ANTHROPIC_API_KEY`
   and are IP-rate-limited (5/day free).
+- **Vercel AI Gateway (optional)** → set `AI_GATEWAY_API_KEY` and platform calls go
+  through the gateway's Anthropic-compatible endpoint instead, for per-request
+  cost/latency dashboards and provider failover. The model slug is provider-prefixed
+  (`GATEWAY_ROAST_MODEL`, default `anthropic/claude-sonnet-4.6`). If the gateway
+  rejects us for a config/auth reason (401/403) we retry once directly on
+  `ANTHROPIC_API_KEY`; budget (402), rate-limit (429) and overload (529) are honored
+  as-is. BYOK never touches the gateway.
 - **Bring your own key (BYOK)** → the browser calls Anthropic **directly** with the
   user's own key (`anthropic-dangerous-direct-browser-access`), so the key never
   touches our server — honoring the "we never see it" promise (PRD §10).
@@ -79,7 +86,8 @@ never the raw document.
 
 1. Push to a Git repo and import into Vercel (framework auto-detected).
 2. Set env vars in the Vercel dashboard: `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SITE_URL`,
-   and (recommended) `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`.
+   and (recommended) `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` plus
+   `AI_GATEWAY_API_KEY`.
 3. Deploy. API routes run on the Node.js runtime. Verify with `GET /api/health`.
 
 ## Monetization

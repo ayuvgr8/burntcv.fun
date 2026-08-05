@@ -36,8 +36,19 @@ const PRICES: { prefix: string; input: number; output: number }[] = [
 ];
 const DEFAULT_PRICE = { input: 3, output: 15 };
 
+// Model ids reach us in two dialects: the direct-Anthropic slug
+// ("claude-sonnet-4-6") and the AI Gateway's provider-prefixed one
+// ("anthropic/claude-sonnet-4.6"). Strip the provider segment so both price
+// against the same tier — otherwise every gateway call would silently fall
+// through to DEFAULT_PRICE and mis-price Opus and Haiku traffic.
+function tierId(model: string): string {
+  const slash = model.lastIndexOf("/");
+  return slash === -1 ? model : model.slice(slash + 1);
+}
+
 export function estimateCostUsd(model: string, usage: ClaudeUsage): number {
-  const p = PRICES.find((x) => model.startsWith(x.prefix)) ?? DEFAULT_PRICE;
+  const id = tierId(model);
+  const p = PRICES.find((x) => id.startsWith(x.prefix)) ?? DEFAULT_PRICE;
   return (
     (usage.input_tokens / 1_000_000) * p.input +
     (usage.output_tokens / 1_000_000) * p.output

@@ -13,6 +13,9 @@ import Landing from "./Landing";
 import FeedbackForm from "./FeedbackForm";
 import JobsSection, { type JobCheck } from "./JobsSection";
 import { extractPdf, requestGlowup, requestJobs, requestRoast, verifyJobUrl } from "@/lib/client";
+import LetterReveal from "./LetterReveal";
+import { DoodleBriefcase, DoodlePlane, DoodleTarget, DoodleTrophy } from "./Doodles";
+import { extractPdf, requestGlowup, requestRoast } from "@/lib/client";
 import { ev } from "@/lib/analytics";
 import {
   purchase,
@@ -64,6 +67,32 @@ type Screen =
   | "history"
   | "feedback";
 
+// Canned, deliberately roastable résumé for the "no résumé handy" chip — every
+// cliché the roast engine loves: task-language, buzzwords, zero numbers.
+const SAMPLE_RESUME = `Rahul Mehta
+Results-driven, passionate professional with a proven track record of leveraging synergies across cross-functional teams. Team player who also works independently.
+
+EXPERIENCE
+Senior Executive, Business Operations — Zenith Solutions (2021–present)
+- Responsible for various tasks related to project coordination and stakeholder management
+- Utilized Microsoft Office to complete deliverables and drive impactful outcomes
+- Helped improve the process that made reporting better across the organization
+- Worked with stakeholders on various strategic initiatives and key priorities
+- Spearheaded synergistic alignment between teams to deliver value-added solutions
+
+Operations Associate — BrightPath Consulting (2019–2021)
+- Handled customer queries and support in a fast-paced environment
+- Assisted senior management with day-to-day activities as required
+- Participated in weekly meetings and contributed innovative ideas
+
+SKILLS
+Microsoft Office, Communication, Leadership, Teamwork, Time Management, Familiar with Python
+
+EDUCATION
+MBA, General Management (2019)
+
+References available on request.`;
+
 const LOADING_MSGS = [
   "Reading between the lines…",
   "Sharpening the knife…",
@@ -100,8 +129,10 @@ const GLOWUP_INCLUDES = [
 // Shared mono section-label + placeholder-highlight styles for the Glow-Up.
 const GLOW_LABEL =
   "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.14em;font-weight:700;color:#0f0623;";
+// NOTE: placeholders must WRAP — long ones ("[Add: number of active users…]")
+// were clipping at the card edge under white-space:nowrap.
 const PH_STYLE =
-  "background:#ffe8a3;color:#7a5a00;font-weight:700;padding:0 4px;border-radius:4px;white-space:nowrap;";
+  "background:#ffe8a3;color:#7a5a00;font-weight:700;padding:0 4px;border-radius:4px;";
 
 // Quoted résumé text gets bolded wherever it appears, so a reader can see at a
 // glance which of THEIR words is being judged — the difference between a joke
@@ -229,7 +260,8 @@ export default function BurntCV() {
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   // Interactive bits of the Glow-Up result: which project card is expanded,
-  // and which stage of the skills roadmap is in view.
+  // which stage of the skills roadmap is in view, and which action-plan steps
+  // the user has ticked off tonight.
   const [openProject, setOpenProject] = useState(0);
   const [roadmapStage, setRoadmapStage] = useState<"now" | "next" | "later">("now");
   // Live openings, loaded after the Glow-Up renders (never blocking it) and
@@ -238,6 +270,10 @@ export default function BurntCV() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [openJob, setOpenJob] = useState(-1);
   const [jobChecks, setJobChecks] = useState<Record<string, JobCheck>>({});
+  const [doneSteps, setDoneSteps] = useState<number[]>([]);
+  const toggleStep = useCallback((i: number) => {
+    setDoneSteps((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]));
+  }, []);
   const [cardVariant, setCardVariant] = useState(0);
   const [wmOff, setWmOff] = useState(false);
   const [passUntil, setPassUntil] = useState(0);
@@ -464,6 +500,17 @@ export default function BurntCV() {
     [toastMsg, scrollToIntensity],
   );
 
+  // Fill the box with the canned sample so a first visit can fire a roast
+  // without hunting for a file. Paste mode so the text is visible + editable.
+  const loadSample = useCallback(() => {
+    setInputMode("paste");
+    setIsLinkedIn(false);
+    setResumeText(SAMPLE_RESUME);
+    ev("sample_loaded");
+    toastMsg("Sample loaded — this one deserves it 🔥");
+    scrollToIntensity();
+  }, [toastMsg, scrollToIntensity]);
+
   // All personas & intensities are free to pick — you pay per roast, not per
   // feature. The gate is at "Roast it".
   const selectIntensity = useCallback((id: string) => setIntensity(id), []);
@@ -634,6 +681,7 @@ export default function BurntCV() {
       setGlowup(null);
       setOpenProject(0);
       setRoadmapStage("now");
+      setDoneSteps([]);
       setMenuOpen(false);
       // Booleans only — never the role text or the JD itself.
       ev("glowup_run", { role: !!role.trim(), jd: !!jd.trim() });
@@ -1167,6 +1215,7 @@ export default function BurntCV() {
       >
         {/* TOP BAR */}
         <div
+          className="bcv-topbar"
           style={css(
             "position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:13px 14px;background:rgba(247,246,244,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(15,6,35,.07);",
           )}
@@ -1207,17 +1256,19 @@ export default function BurntCV() {
           </div>
         </div>
 
-        <div ref={scrollRef} style={css("flex:1;overflow-y:auto;")}>
+        <div ref={scrollRef} className="bcv-scroll" style={css("flex:1;overflow-y:auto;")}>
           {/* ===== SETUP ===== */}
           {screen === "input" && (
             <>
               <div
-                className="bcv-screen bcv-narrow"
+                className="bcv-screen bcv-tight-bottom"
                 style={css(
                   "padding:22px 18px 130px;display:flex;flex-direction:column;gap:22px;",
                 )}
               >
-                <div>
+                <div style={css("position:relative;")}>
+                  <DoodlePlane pos="top:-4px;right:40px" rotate={-10} />
+                  <DoodleBriefcase pos="top:44px;right:150px" size={52} rotate={7} />
                   <h2 style={css("font-size:28px;font-weight:900;letter-spacing:-.02em;margin:0 0 6px;")}>
                     {isLinkedIn ? "Feed me your LinkedIn" : "Feed me your résumé"}
                   </h2>
@@ -1228,6 +1279,9 @@ export default function BurntCV() {
                   </p>
                 </div>
 
+                {/* Desktop: résumé entry left, pickers right (inert on mobile). */}
+                <div className="bcv-cols">
+                <div className="bcv-col">
                 <div
                   style={css(
                     "display:flex;gap:6px;background:rgba(15,6,35,.05);padding:5px;border-radius:13px;",
@@ -1381,14 +1435,26 @@ export default function BurntCV() {
                     "width:100%;min-height:150px;resize:vertical;border:1.5px solid rgba(15,6,35,.12);border-radius:14px;padding:15px;font-size:14.5px;line-height:1.55;color:#222;background:#fff;",
                   )}
                 />
-                <div style={css("margin-top:-12px;")}>
+                <div style={css("margin-top:-12px;display:flex;align-items:center;justify-content:space-between;gap:10px;")}>
                   <span style={css("font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9c9c9c;")}>
                     {resumeText.trim().length < 40
                       ? "paste at least a few lines"
                       : resumeText.length + " chars · ready"}
                   </span>
+                  {!resumeText.trim() && (
+                    <button
+                      onClick={loadSample}
+                      style={css(
+                        "flex:none;border:1px solid rgba(78,49,136,.3);background:rgba(78,49,136,.05);color:#4e3188;cursor:pointer;font-size:11.5px;font-weight:800;padding:6px 12px;border-radius:999px;",
+                      )}
+                    >
+                      ✨ No résumé handy? Roast the sample
+                    </button>
+                  )}
+                </div>
                 </div>
 
+                <div className="bcv-col">
                 <div ref={intensityRef} style={css("scroll-margin-top:70px;")}>
                   <div
                     style={css(
@@ -1474,8 +1540,11 @@ export default function BurntCV() {
                     })}
                   </div>
                 </div>
+                </div>
+                </div>
               </div>
               <div
+                className="bcv-dock bcv-dock-inline"
                 style={css(
                   "position:absolute;bottom:0;left:0;right:0;padding:14px 18px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(to top,#f7f6f4 72%,rgba(247,246,244,0));",
                 )}
@@ -1496,9 +1565,13 @@ export default function BurntCV() {
           {screen === "roasting" && (
             <div
               style={css(
-                "min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:26px;text-align:center;",
+                "position:relative;min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:26px;text-align:center;",
               )}
             >
+              <DoodlePlane pos="top:16%;left:14%" drift />
+              <DoodleTarget pos="top:20%;right:12%" size={60} rotate={12} />
+              <DoodleBriefcase pos="bottom:18%;left:16%" size={54} rotate={-9} />
+              <DoodleTrophy pos="bottom:15%;right:15%" size={58} rotate={7} />
               <div style={css("position:relative;width:96px;height:96px;")}>
                 <div
                   style={css(
@@ -1532,7 +1605,7 @@ export default function BurntCV() {
           {screen === "result" && roast && (
             <>
               <div
-                className="bcv-screen"
+                className="bcv-screen bcv-anim"
                 style={css("padding:18px 18px 150px;display:flex;flex-direction:column;gap:18px;")}
               >
                 <div style={css("display:flex;gap:8px;flex-wrap:wrap;")}>
@@ -1554,6 +1627,9 @@ export default function BurntCV() {
                   </span>
                 </div>
 
+                {/* Desktop: cold open + buzzword meter side by side. */}
+                <div className="bcv-hero" style={css("position:relative;")}>
+                  <DoodlePlane pos="top:-26px;right:2px" size={56} rotate={-12} />
                 <div
                   style={css(
                     "border-left:4px solid #f98731;background:rgba(249,135,49,.07);border-radius:0 14px 14px 0;padding:15px 17px;",
@@ -1617,6 +1693,7 @@ export default function BurntCV() {
                     </div>
                   </div>
                 )}
+                </div>
 
                 <div>
                   <div
@@ -1733,7 +1810,8 @@ export default function BurntCV() {
                 )}
 
                 {roast.strengths && roast.strengths.length > 0 && (
-                  <div>
+                  <div style={css("position:relative;")}>
+                    <DoodleTrophy pos="top:-16px;right:8px" size={54} rotate={-7} />
                     <div
                       style={css(
                         "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.16em;font-weight:700;color:#1f8a5b;margin-bottom:11px;",
@@ -1741,7 +1819,7 @@ export default function BurntCV() {
                     >
                       §03 — WHAT&apos;S ACTUALLY WORKING ✅
                     </div>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {roast.strengths.map((s, i) => (
                         <div
                           key={i}
@@ -1878,6 +1956,7 @@ export default function BurntCV() {
                 </div>
               </div>
               <div
+                className="bcv-dock"
                 style={css(
                   "position:absolute;bottom:0;left:0;right:0;padding:13px 18px calc(15px + env(safe-area-inset-bottom));background:linear-gradient(to top,#f7f6f4 72%,rgba(247,246,244,0));display:flex;flex-direction:column;gap:9px;",
                 )}
@@ -2197,7 +2276,7 @@ export default function BurntCV() {
           {/* ===== GLOW-UP ===== */}
           {/* ===== GLOW-UP SETUP (role + JD, always before payment) ===== */}
           {screen === "glowup_setup" && (
-            <div className="bcv-screen bcv-narrow" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+            <div className="bcv-screen bcv-narrow bcv-anim" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
               <div>
                 <div
                   style={css(
@@ -2206,7 +2285,8 @@ export default function BurntCV() {
                 >
                   ✨ THE GLOW-UP
                 </div>
-                <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
+                <h2 style={css("position:relative;font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
+                  <DoodleTarget pos="top:-18px;right:0" size={58} rotate={10} />
                   What job are we aiming at?
                 </h2>
                 <p style={css("margin:0;font-size:14px;color:#5a5a5a;line-height:1.5;")}>
@@ -2297,8 +2377,10 @@ export default function BurntCV() {
           )}
 
           {screen === "glowup" && (
-            <div className="bcv-screen" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
-              <div>
+            <div className="bcv-screen bcv-anim" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+              <div style={css("position:relative;")}>
+                <DoodlePlane pos="top:-6px;right:30px" rotate={-8} />
+                <DoodleTarget pos="top:64px;right:130px" size={54} rotate={10} />
                 <div
                   style={css(
                     "display:inline-flex;align-items:center;gap:7px;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:11px;letter-spacing:.1em;padding:6px 12px;border-radius:999px;",
@@ -2307,7 +2389,11 @@ export default function BurntCV() {
                   ✨ THE GLOW-UP
                 </div>
                 <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
-                  The same flaws, now fixed.
+                  <LetterReveal
+                    text="The same flaws, now fixed."
+                    colors={["#A97CF8", "#F38CB8", "#FDCC92"]}
+                    duration={1.1}
+                  />
                 </h2>
                 <p style={css("margin:0;font-size:14px;color:#5a5a5a;line-height:1.5;")}>
                   The roast found the problems. Here&apos;s the part that gets you the callback.
@@ -2324,7 +2410,9 @@ export default function BurntCV() {
                 )}
               </div>
               {glowupLoading && (
-                <div style={css("display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0;")}>
+                <div style={css("position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0;")}>
+                  <DoodlePlane pos="top:8px;left:18%" drift />
+                  <DoodleTrophy pos="bottom:12px;right:16%" size={54} rotate={8} />
                   <div
                     style={css(
                       "width:54px;height:54px;border-radius:50%;border:4px solid rgba(78,49,136,.14);border-top-color:#4e3188;animation:spin .9s linear infinite;",
@@ -2337,6 +2425,8 @@ export default function BurntCV() {
               )}
               {glowup && (
                 <>
+                  {/* Desktop: score + start-here pair up as the hero row. */}
+                  <div className="bcv-hero">
                   {/* Hireability arc — the "was X, now Y" payoff, animated up. */}
                   <ScoreArc before={glowup.score_before} after={glowup.score_after} />
 
@@ -2353,6 +2443,7 @@ export default function BurntCV() {
                       {hlPlaceholders(glowup.one_thing)}
                     </p>
                   </div>
+                  </div>
 
                   {/* Real assets already on the page — what not to edit away. */}
                   {glowup.strengths.length > 0 && (
@@ -2360,7 +2451,7 @@ export default function BurntCV() {
                       <div style={css(GLOW_LABEL + "color:#1f8a5b;margin-bottom:10px;")}>
                         ✅ LEAD WITH THESE
                       </div>
-                      <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
+                      <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:8px;")}>
                         {glowup.strengths.map((s, i) => (
                           <div
                             key={i}
@@ -2369,7 +2460,7 @@ export default function BurntCV() {
                             )}
                           >
                             <span style={css("flex:none;color:#1f8a5b;font-weight:900;")}>✓</span>
-                            <div style={css("font-size:13px;line-height:1.5;color:#14503a;")}>
+                            <div style={css("font-size:14px;line-height:1.5;color:#14503a;")}>
                               {emphasize(s, "font-weight:800;color:#0d3b2a;")}
                             </div>
                           </div>
@@ -2477,6 +2568,8 @@ export default function BurntCV() {
                   {/* Filler to delete, with the reason it hurts. */}
                   <div>
                     <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>✂️ CUT THESE</div>
+                    {/* 2-col only: cut lists run 3-4 items, and a 3-col grid
+                        strands the 4th card across a mostly-dead row. */}
                     <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
                       {glowup.cut.map((c, i) => (
                         // Stacked, not side-by-side: the model quotes whole
@@ -2490,12 +2583,12 @@ export default function BurntCV() {
                         >
                           <div
                             style={css(
-                              "font-size:13px;font-weight:700;line-height:1.45;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);",
+                              "font-size:13.5px;font-weight:700;line-height:1.45;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);",
                             )}
                           >
                             {c.text}
                           </div>
-                          <div style={css("margin-top:5px;font-size:12px;color:#7a5a63;line-height:1.45;")}>
+                          <div style={css("margin-top:5px;font-size:13px;color:#7a5a63;line-height:1.5;")}>
                             {emphasize(c.why, "font-weight:800;color:#5c2f3f;")}
                           </div>
                         </div>
@@ -2508,6 +2601,7 @@ export default function BurntCV() {
                     label="👁️ WHAT RECRUITERS READ"
                     items={glowup.recruiter_read}
                     note="The assumptions your résumé creates before anyone speaks to you — and how to flip each one."
+                    accent="#4e3188"
                   />
 
                   {/* Keywords an ATS filters on that are missing. */}
@@ -2515,6 +2609,7 @@ export default function BurntCV() {
                     label="🤖 ATS BLIND SPOTS"
                     items={glowup.ats_gaps}
                     note="Words the screening software looks for and can't find on your page. Add them where they're true."
+                    accent="#0077b5"
                   />
 
                   {/* Pointed questions this résumé invites. */}
@@ -2522,17 +2617,19 @@ export default function BurntCV() {
                     label="💣 INTERVIEW LANDMINES"
                     items={glowup.interview_landmines}
                     note="Questions this résumé invites. Prepare them now and they stop being landmines."
+                    accent="#ed3237"
                   />
 
                   {/* Where this résumé can go next + what to add. */}
-                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                  <div style={css("position:relative;border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <DoodlePlane pos="top:-24px;right:12px" size={58} rotate={12} />
                     <div style={css(GLOW_LABEL + "margin-bottom:11px;")}>🚀 WHERE THIS GOES NEXT</div>
                     <div style={css("display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;")}>
                       {glowup.next_moves.roles.map((r, i) => (
                         <span
                           key={i}
                           style={css(
-                            "background:#0f0623;color:#fff;border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;",
+                            "background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:800;box-shadow:0 8px 16px -10px rgba(237,50,55,.6);",
                           )}
                         >
                           {r}
@@ -2543,7 +2640,7 @@ export default function BurntCV() {
                       {glowup.next_moves.gaps.map((g, i) => (
                         <div
                           key={i}
-                          style={css("display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#333;line-height:1.45;")}
+                          style={css("display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:#333;line-height:1.5;")}
                         >
                           <span style={css("color:#1f8a5b;font-weight:800;flex:none;")}>+</span>
                           {g}
@@ -2565,27 +2662,40 @@ export default function BurntCV() {
                         )}
                       >
                         <div style={css(GLOW_LABEL)}>🗓️ DO THIS TONIGHT</div>
-                        <span style={css("font-size:11px;font-weight:800;color:#4e3188;flex:none;")}>
-                          ~{totalPlanMinutes} MIN
+                        <span style={css("font-size:11px;font-weight:800;flex:none;" + (doneSteps.length ? "color:#1f8a5b;" : "color:#4e3188;"))}>
+                          {doneSteps.length
+                            ? `${doneSteps.length}/${glowup.action_plan.length} DONE 🎉`
+                            : `~${totalPlanMinutes} MIN`}
                         </span>
                       </div>
                       <p style={css("margin:0 0 12px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
-                        In order. Highest impact first — stop whenever you run out of evening.
+                        In order, highest impact first — tap a step to tick it off.
                       </p>
-                      <div style={css("display:flex;flex-direction:column;gap:9px;")}>
-                        {glowup.action_plan.map((a, i) => (
-                          <div key={i} style={css("display:flex;gap:11px;align-items:flex-start;")}>
+                      <div style={css("display:flex;flex-direction:column;gap:6px;")}>
+                        {glowup.action_plan.map((a, i) => {
+                          const done = doneSteps.includes(i);
+                          return (
+                          <div
+                            key={i}
+                            className="bcv-step"
+                            onClick={() => toggleStep(i)}
+                            style={css("display:flex;gap:11px;align-items:flex-start;padding:6px 8px;margin:0 -8px;" + (done ? "opacity:.55;" : ""))}
+                          >
                             <div
                               style={css(
-                                "flex:none;width:23px;height:23px;border-radius:50%;background:#0f0623;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;",
+                                "flex:none;width:23px;height:23px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;transition:background .15s;" +
+                                  (done ? "background:#1f8a5b;" : "background:#0f0623;"),
                               )}
                             >
-                              {i + 1}
+                              {done ? "✓" : i + 1}
                             </div>
                             <div style={css("min-width:0;")}>
                               <div
                                 style={css(
-                                  "font-size:13.5px;line-height:1.45;color:#0f0623;font-weight:700;",
+                                  "font-size:14.5px;line-height:1.45;font-weight:700;" +
+                                    (done
+                                      ? "color:#5a5a5a;text-decoration:line-through;text-decoration-color:rgba(31,138,91,.6);"
+                                      : "color:#0f0623;"),
                                 )}
                               >
                                 {hlPlaceholders(a.step)}
@@ -2593,7 +2703,7 @@ export default function BurntCV() {
                               {a.detail && (
                                 <div
                                   style={css(
-                                    "margin-top:4px;font-size:12.5px;line-height:1.5;color:#5a5a5a;",
+                                    "margin-top:4px;font-size:13px;line-height:1.55;color:#5a5a5a;",
                                   )}
                                 >
                                   {hlPlaceholders(a.detail)}
@@ -2610,19 +2720,21 @@ export default function BurntCV() {
                               )}
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
                   {/* Projects to go build — each one earns a bullet this résumé
                       is missing. Tap a card to expand it. */}
-                  <div>
+                  <div style={css("position:relative;")}>
+                    <DoodleTarget pos="top:-18px;right:10px" size={56} rotate={-8} />
                     <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🛠 BUILD YOUR PROOF</div>
                     <p style={css("margin:0 0 10px;font-size:12.5px;color:#5a5a5a;line-height:1.45;")}>
-                      Projects that earn the bullets you can&apos;t write yet — tap one to see the play.
+                      Enterprise-weight projects that earn the bullets you can&apos;t write yet — tap one to see the play.
                     </p>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2 bcv-nospan" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.projects.map((p, i) => {
                         const open = openProject === i;
                         return (
@@ -2651,6 +2763,7 @@ export default function BurntCV() {
                                 {p.title}
                               </span>
                               <span
+                                className="bcv-proj-chevron"
                                 style={css(
                                   "flex:none;color:#9c9c9c;font-size:13px;transition:transform .15s;" +
                                     (open ? "transform:rotate(90deg);" : ""),
@@ -2659,50 +2772,65 @@ export default function BurntCV() {
                                 ›
                               </span>
                             </div>
-                            {open && (
-                              <div style={css("padding:0 14px 13px;display:flex;flex-direction:column;gap:10px;")}>
-                                <div style={css("font-size:13px;color:#333;line-height:1.5;")}>{p.what}</div>
-                                <div style={css("background:rgba(31,138,91,.06);border:1px solid rgba(31,138,91,.18);border-radius:11px;padding:10px 12px;")}>
-                                  <div style={css("font-size:9px;font-weight:800;letter-spacing:.1em;color:#1f8a5b;margin-bottom:4px;")}>
-                                    THE BULLET IT EARNS
-                                  </div>
-                                  <div style={css("font-size:12.5px;color:#0f0623;line-height:1.5;font-weight:600;")}>
-                                    {hlPlaceholders(p.bullet)}
-                                  </div>
+                            {/* Accordion on mobile; always open on desktop so an
+                                expanded card never sits beside a dead stub. */}
+                            <div
+                              className={"bcv-proj-body" + (open ? " bcv-open" : "")}
+                              style={css("padding:0 14px 13px;flex-direction:column;gap:10px;")}
+                            >
+                              <div style={css("font-size:13.5px;color:#333;line-height:1.5;")}>{p.what}</div>
+                              <div style={css("background:rgba(31,138,91,.06);border:1px solid rgba(31,138,91,.18);border-radius:11px;padding:10px 12px;")}>
+                                <div style={css("font-size:9px;font-weight:800;letter-spacing:.1em;color:#1f8a5b;margin-bottom:4px;")}>
+                                  THE BULLET IT EARNS
+                                </div>
+                                <div style={css("font-size:13px;color:#0f0623;line-height:1.5;font-weight:600;")}>
+                                  {hlPlaceholders(p.bullet)}
                                 </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Where to actually send this résumé. */}
-                  <div>
-                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
-                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
+                  {/* Where to actually send this résumé. Industry + stage per
+                      card, real company names as live job-search links. */}
+                  <div style={css("position:relative;")}>
+                    <DoodleBriefcase pos="top:-16px;right:8px" size={56} rotate={8} />
+                    <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🏢 WHERE TO AIM IT</div>
+                    <p style={css("margin:0 2px 10px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+                      Industries where this profile wins, with real names — tap a company to see its openings ↗
+                    </p>
+                    <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.companies.map((c, i) => (
                         <div
                           key={i}
                           style={css("border:1px solid rgba(15,6,35,.1);border-radius:14px;background:#fff;padding:13px 14px;")}
                         >
-                          <div style={css("font-size:14px;font-weight:800;color:#0f0623;line-height:1.35;")}>
+                          <div style={css("font-size:15px;font-weight:800;color:#0f0623;line-height:1.35;")}>
                             {c.type}
                           </div>
-                          <div style={css("font-size:12.5px;color:#5a5a5a;line-height:1.45;margin:4px 0 9px;")}>
+                          <div style={css("font-size:13px;color:#5a5a5a;line-height:1.5;margin:4px 0 9px;")}>
                             {c.why}
                           </div>
                           <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
                             {c.examples.map((e, j) => (
-                              <span
+                              <a
                                 key={j}
+                                className="bcv-chip"
+                                href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(
+                                  `${e} ${targetRole.trim()}`.trim(),
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => ev("company_chip_click")}
                                 style={css(
-                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;",
+                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;",
                                 )}
                               >
-                                {e}
-                              </span>
+                                {e} ↗
+                              </a>
                             ))}
                           </div>
                         </div>
@@ -2723,7 +2851,8 @@ export default function BurntCV() {
                   />
 
                   {/* Skills / tech to master, staged Now → Next → Later. */}
-                  <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                  <div style={css("position:relative;border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:16px 17px;")}>
+                    <DoodleTrophy pos="top:-30px;right:14px" rotate={-6} />
                     <div style={css(GLOW_LABEL + "margin-bottom:11px;")}>🧭 YOUR SKILL ROADMAP</div>
                     <div style={css("display:flex;gap:6px;background:rgba(15,6,35,.05);padding:5px;border-radius:13px;margin-bottom:12px;")}>
                       {(
@@ -2742,7 +2871,7 @@ export default function BurntCV() {
                       {glowup.roadmap[roadmapStage].map((s, i) => (
                         <div
                           key={roadmapStage + i}
-                          style={css("display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:#222;line-height:1.45;")}
+                          style={css("display:flex;gap:9px;align-items:flex-start;font-size:14.5px;color:#222;line-height:1.5;")}
                         >
                           <span
                             style={css(
@@ -2766,6 +2895,7 @@ export default function BurntCV() {
                   </div>
 
                   {/* Assemble summary + fixed bullets into one pasteable block. */}
+                  <div className="bcv-cta">
                   <button
                     onClick={copyGlowup}
                     style={css(
@@ -2782,6 +2912,7 @@ export default function BurntCV() {
                   >
                     Back to the share card 🔥
                   </button>
+                  </div>
                 </>
               )}
             </div>
@@ -2810,6 +2941,8 @@ export default function BurntCV() {
                 )}
               </div>
 
+              {/* Desktop: offer cards sit side by side (inert on mobile). */}
+              <div className="bcv-offers">
               {showSingle && (
                 <div
                   style={css(
@@ -2991,6 +3124,7 @@ export default function BurntCV() {
                   </div>
                 </div>
               )}
+              </div>
 
               <div style={css("display:flex;align-items:center;gap:12px;color:#9c9c9c;font-size:12px;font-weight:600;")}>
                 <span style={css("flex:1;height:1px;background:rgba(15,6,35,.1);")}></span>OR
@@ -3309,6 +3443,34 @@ export default function BurntCV() {
 function ScoreArc({ before, after }: { before: number; after: number }) {
   const [val, setVal] = useState(before);
   const [fill, setFill] = useState(false);
+  // Confetti the first time the score enters the viewport — the "reached the
+  // payoff" moment. Dynamic import keeps canvas-confetti out of the main bundle.
+  const arcRef = useRef<HTMLDivElement | null>(null);
+  const poppedRef = useRef(false);
+  useEffect(() => {
+    poppedRef.current = false;
+    const el = arcRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting) || poppedRef.current) return;
+        poppedRef.current = true;
+        io.disconnect();
+        import("canvas-confetti").then(({ default: confetti }) => {
+          const r = el.getBoundingClientRect();
+          const origin = {
+            x: (r.left + r.width / 2) / window.innerWidth,
+            y: Math.max(0.1, (r.top + r.height / 2) / window.innerHeight),
+          };
+          confetti({ particleCount: 90, spread: 75, startVelocity: 32, origin, colors: ["#f98731", "#ed3237", "#ea4c89", "#ffdd00", "#1f8a5b"] });
+          setTimeout(() => confetti({ particleCount: 45, spread: 100, startVelocity: 24, origin }), 250);
+        });
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [before, after]);
   useEffect(() => {
     setVal(before);
     setFill(false);
@@ -3332,7 +3494,7 @@ function ScoreArc({ before, after }: { before: number; after: number }) {
   const beforePct = Math.max(0, Math.min(100, before));
   const afterPct = Math.max(0, Math.min(100, after));
   return (
-    <div style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:17px 18px;")}>
+    <div ref={arcRef} style={css("border:1px solid rgba(15,6,35,.1);border-radius:16px;background:#fff;padding:17px 18px;")}>
       <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;")}>
         <span style={css(GLOW_LABEL)}>HIREABILITY</span>
         {delta > 0 && (
@@ -3367,27 +3529,39 @@ function ScoreArc({ before, after }: { before: number; after: number }) {
   );
 }
 
-// A simple titled list card used for the recruiter-read and landmine sections.
-function GlowList({ label, items, note }: { label: string; items: string[]; note?: string }) {
+// A titled list card used for the recruiter-read / ATS / landmine sections.
+// `accent` colors the label, the marker, and a left border stripe so each
+// section is instantly tellable apart while scanning.
+function GlowList({
+  label,
+  items,
+  note,
+  accent = "#4e3188",
+}: {
+  label: string;
+  items: string[];
+  note?: string;
+  accent?: string;
+}) {
   return (
     <div>
-      <div style={css(GLOW_LABEL + (note ? "margin-bottom:4px;" : "margin-bottom:10px;"))}>
+      <div style={css(GLOW_LABEL + `color:${accent};` + (note ? "margin-bottom:4px;" : "margin-bottom:10px;"))}>
         {label}
       </div>
       {note && (
-        <p style={css("margin:0 2px 10px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+        <p style={css("margin:0 2px 10px;font-size:13px;color:#6a6a6a;line-height:1.45;")}>
           {note}
         </p>
       )}
-      <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
+      <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:8px;")}>
         {items.map((it, i) => (
           <div
             key={i}
             style={css(
-              "display:flex;gap:9px;align-items:flex-start;background:#fff;border:1px solid rgba(15,6,35,.1);border-radius:12px;padding:11px 13px;font-size:13px;color:#333;line-height:1.45;",
+              `display:flex;gap:9px;align-items:flex-start;background:#fff;border:1px solid rgba(15,6,35,.1);border-left:4px solid ${accent};border-radius:12px;padding:12px 14px;font-size:14px;color:#333;line-height:1.5;`,
             )}
           >
-            <span style={css("color:#4e3188;font-weight:800;flex:none;")}>›</span>
+            <span style={css(`color:${accent};font-weight:800;flex:none;`)}>›</span>
             <div>{hlPlaceholders(it)}</div>
           </div>
         ))}

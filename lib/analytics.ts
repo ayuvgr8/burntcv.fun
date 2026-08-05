@@ -11,6 +11,7 @@ export function ev(
     | "card_download"
     | "card_share"
     | "caption_copy"
+    | "sample_loaded" // tried the canned sample résumé from the input screen
     | "glowup_setup" // opened the role / JD screen (the step before paying)
     | "glowup_run"
     | "glowup_copy"
@@ -19,6 +20,7 @@ export function ev(
     // actually earning its ship criteria (docs/jobs-feed-spec.md §9).
     | "jobs_loaded"
     | "job_apply_click"
+    | "company_chip_click" // tapped a Where-To-Aim company → LinkedIn jobs
     | "purchase"
     | "byok_added",
   props?: Record<string, string | number | boolean>,

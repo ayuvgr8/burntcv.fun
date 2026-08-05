@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { css } from "./css";
 import Footer from "./Footer";
+import LetterReveal from "./LetterReveal";
 import { PERSONAS, INTENSITIES } from "@/lib/roast";
 
 // ---------------------------------------------------------------------------
@@ -228,11 +229,17 @@ export default function Landing({
         <div style={css("display:flex;align-items:center;gap:18px;")}>
           <button
             onClick={onRoast}
+            className="bcv-navcta"
             style={css(
-              "border:none;cursor:pointer;background:#0f0623;color:#fff;font-weight:700;font-size:14px;padding:11px 18px;border-radius:11px;",
+              "border:none;cursor:pointer;background:linear-gradient(115deg,#f98731,#ed3237 62%,#ea4c89);color:#fff;font-weight:800;font-size:14px;padding:11px 19px;border-radius:999px;box-shadow:0 8px 18px -8px rgba(237,50,55,.55);",
             )}
           >
-            Roast my résumé
+            <LetterReveal
+              text="Roast my résumé 🔥"
+              colors={["#fff"]}
+              delay={0.35}
+              duration={0.9}
+            />
           </button>
         </div>
       </div>
