@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { css } from "./css";
 import Footer from "./Footer";
+import LetterReveal from "./LetterReveal";
 import { PERSONAS, INTENSITIES } from "@/lib/roast";
 
 // ---------------------------------------------------------------------------
@@ -232,7 +233,12 @@ export default function Landing({
               "border:none;cursor:pointer;background:#0f0623;color:#fff;font-weight:700;font-size:14px;padding:11px 18px;border-radius:11px;",
             )}
           >
-            Roast my résumé
+            <LetterReveal
+              text="Roast my résumé"
+              colors={["#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7"]}
+              delay={0.35}
+              duration={1.6}
+            />
           </button>
         </div>
       </div>
