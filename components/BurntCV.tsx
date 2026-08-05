@@ -1522,9 +1522,13 @@ export default function BurntCV() {
           {screen === "roasting" && (
             <div
               style={css(
-                "min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:26px;text-align:center;",
+                "position:relative;min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:26px;text-align:center;",
               )}
             >
+              <DoodlePlane pos="top:16%;left:14%" drift />
+              <DoodleTarget pos="top:20%;right:12%" size={60} rotate={12} />
+              <DoodleBriefcase pos="bottom:18%;left:16%" size={54} rotate={-9} />
+              <DoodleTrophy pos="bottom:15%;right:15%" size={58} rotate={7} />
               <div style={css("position:relative;width:96px;height:96px;")}>
                 <div
                   style={css(
@@ -1558,7 +1562,7 @@ export default function BurntCV() {
           {screen === "result" && roast && (
             <>
               <div
-                className="bcv-screen"
+                className="bcv-screen bcv-anim"
                 style={css("padding:18px 18px 150px;display:flex;flex-direction:column;gap:18px;")}
               >
                 <div style={css("display:flex;gap:8px;flex-wrap:wrap;")}>
@@ -1581,7 +1585,8 @@ export default function BurntCV() {
                 </div>
 
                 {/* Desktop: cold open + buzzword meter side by side. */}
-                <div className="bcv-hero">
+                <div className="bcv-hero" style={css("position:relative;")}>
+                  <DoodlePlane pos="top:-26px;right:2px" size={56} rotate={-12} />
                 <div
                   style={css(
                     "border-left:4px solid #f98731;background:rgba(249,135,49,.07);border-radius:0 14px 14px 0;padding:15px 17px;",
@@ -1762,7 +1767,8 @@ export default function BurntCV() {
                 )}
 
                 {roast.strengths && roast.strengths.length > 0 && (
-                  <div>
+                  <div style={css("position:relative;")}>
+                    <DoodleTrophy pos="top:-16px;right:8px" size={54} rotate={-7} />
                     <div
                       style={css(
                         "font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.16em;font-weight:700;color:#1f8a5b;margin-bottom:11px;",
@@ -2227,7 +2233,7 @@ export default function BurntCV() {
           {/* ===== GLOW-UP ===== */}
           {/* ===== GLOW-UP SETUP (role + JD, always before payment) ===== */}
           {screen === "glowup_setup" && (
-            <div className="bcv-screen bcv-narrow" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+            <div className="bcv-screen bcv-narrow bcv-anim" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
               <div>
                 <div
                   style={css(
@@ -2236,7 +2242,8 @@ export default function BurntCV() {
                 >
                   ✨ THE GLOW-UP
                 </div>
-                <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
+                <h2 style={css("position:relative;font-size:26px;font-weight:900;letter-spacing:-.02em;margin:14px 0 4px;")}>
+                  <DoodleTarget pos="top:-18px;right:0" size={58} rotate={10} />
                   What job are we aiming at?
                 </h2>
                 <p style={css("margin:0;font-size:14px;color:#5a5a5a;line-height:1.5;")}>
@@ -2327,7 +2334,7 @@ export default function BurntCV() {
           )}
 
           {screen === "glowup" && (
-            <div className="bcv-screen" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+            <div className="bcv-screen bcv-anim" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
               <div style={css("position:relative;")}>
                 <DoodlePlane pos="top:-6px;right:30px" rotate={-8} />
                 <DoodleTarget pos="top:64px;right:130px" size={54} rotate={10} />
@@ -2360,7 +2367,9 @@ export default function BurntCV() {
                 )}
               </div>
               {glowupLoading && (
-                <div style={css("display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0;")}>
+                <div style={css("position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0;")}>
+                  <DoodlePlane pos="top:8px;left:18%" drift />
+                  <DoodleTrophy pos="bottom:12px;right:16%" size={54} rotate={8} />
                   <div
                     style={css(
                       "width:54px;height:54px;border-radius:50%;border:4px solid rgba(78,49,136,.14);border-top-color:#4e3188;animation:spin .9s linear infinite;",
