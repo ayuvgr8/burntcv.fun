@@ -1118,6 +1118,7 @@ export default function BurntCV() {
     <div style={css("min-height:100vh;background:#e9e7ec;display:flex;justify-content:center;")}>
       {toast && <Toast toast={toast} />}
       <div
+        className="bcv-frame"
         style={css(
           "width:100%;max-width:480px;background:#f7f6f4;min-height:100vh;display:flex;flex-direction:column;box-shadow:0 0 90px rgba(15,6,35,.14);position:relative;overflow:hidden;",
         )}
@@ -1169,6 +1170,7 @@ export default function BurntCV() {
           {screen === "input" && (
             <>
               <div
+                className="bcv-screen bcv-narrow"
                 style={css(
                   "padding:22px 18px 130px;display:flex;flex-direction:column;gap:22px;",
                 )}
@@ -1488,6 +1490,7 @@ export default function BurntCV() {
           {screen === "result" && roast && (
             <>
               <div
+                className="bcv-screen"
                 style={css("padding:18px 18px 150px;display:flex;flex-direction:column;gap:18px;")}
               >
                 <div style={css("display:flex;gap:8px;flex-wrap:wrap;")}>
@@ -1588,7 +1591,7 @@ export default function BurntCV() {
                   >
                     Every burn comes with the fix. Read the joke, then go change the line.
                   </p>
-                  <div style={css("display:flex;flex-direction:column;gap:10px;")}>
+                  <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:10px;")}>
                     {roast.roasts.map((line, i) => (
                       <div
                         key={i}
@@ -1655,7 +1658,7 @@ export default function BurntCV() {
                     >
                       § THE BUZZWORD AUTOPSY 🔬
                     </div>
-                    <div style={css("display:grid;grid-template-columns:1fr 1fr;gap:8px;")}>
+                    <div className="bcv-grid3" style={css("display:grid;grid-template-columns:1fr 1fr;gap:8px;")}>
                       {roast.bento.map((b, i) => {
                         const pal = BENTO_PALETTES[i % BENTO_PALETTES.length];
                         const hero = i === 0;
@@ -1696,7 +1699,7 @@ export default function BurntCV() {
                     >
                       §03 — WHAT&apos;S ACTUALLY WORKING ✅
                     </div>
-                    <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {roast.strengths.map((s, i) => (
                         <div
                           key={i}
@@ -2152,7 +2155,7 @@ export default function BurntCV() {
           {/* ===== GLOW-UP ===== */}
           {/* ===== GLOW-UP SETUP (role + JD, always before payment) ===== */}
           {screen === "glowup_setup" && (
-            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+            <div className="bcv-screen bcv-narrow" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
               <div>
                 <div
                   style={css(
@@ -2252,7 +2255,7 @@ export default function BurntCV() {
           )}
 
           {screen === "glowup" && (
-            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
+            <div className="bcv-screen" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:18px;")}>
               <div>
                 <div
                   style={css(
@@ -2315,7 +2318,7 @@ export default function BurntCV() {
                       <div style={css(GLOW_LABEL + "color:#1f8a5b;margin-bottom:10px;")}>
                         ✅ LEAD WITH THESE
                       </div>
-                      <div style={css("display:flex;flex-direction:column;gap:8px;")}>
+                      <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
                         {glowup.strengths.map((s, i) => (
                           <div
                             key={i}
@@ -2366,7 +2369,7 @@ export default function BurntCV() {
                       Each one explains what changed, so you can apply the same move to the
                       bullets we didn&apos;t touch.
                     </p>
-                    <div style={css("display:flex;flex-direction:column;gap:10px;")}>
+                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:10px;")}>
                       {glowup.rewrites.map((g, i) => (
                         <div
                           key={i}
@@ -2432,24 +2435,27 @@ export default function BurntCV() {
                   {/* Filler to delete, with the reason it hurts. */}
                   <div>
                     <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>✂️ CUT THESE</div>
-                    <div style={css("display:flex;flex-direction:column;gap:8px;")}>
+                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
                       {glowup.cut.map((c, i) => (
+                        // Stacked, not side-by-side: the model quotes whole
+                        // bullets, and a non-wrapping quote next to a squeezed
+                        // reason column overflowed the card.
                         <div
                           key={i}
                           style={css(
-                            "display:flex;gap:10px;align-items:baseline;background:rgba(237,50,55,.05);border:1px solid rgba(237,50,55,.14);border-radius:12px;padding:10px 13px;",
+                            "background:rgba(237,50,55,.05);border:1px solid rgba(237,50,55,.14);border-radius:12px;padding:11px 13px;",
                           )}
                         >
-                          <span
+                          <div
                             style={css(
-                              "font-size:13px;font-weight:700;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);flex:none;",
+                              "font-size:13px;font-weight:700;line-height:1.45;color:#b3245f;text-decoration:line-through;text-decoration-color:rgba(179,36,95,.5);",
                             )}
                           >
                             {c.text}
-                          </span>
-                          <span style={css("font-size:12px;color:#7a5a63;line-height:1.4;")}>
-                            — {emphasize(c.why, "font-weight:800;color:#5c2f3f;")}
-                          </span>
+                          </div>
+                          <div style={css("margin-top:5px;font-size:12px;color:#7a5a63;line-height:1.45;")}>
+                            {emphasize(c.why, "font-weight:800;color:#5c2f3f;")}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2574,7 +2580,7 @@ export default function BurntCV() {
                     <p style={css("margin:0 0 10px;font-size:12.5px;color:#5a5a5a;line-height:1.45;")}>
                       Projects that earn the bullets you can&apos;t write yet — tap one to see the play.
                     </p>
-                    <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.projects.map((p, i) => {
                         const open = openProject === i;
                         return (
@@ -2633,7 +2639,7 @@ export default function BurntCV() {
                   {/* Where to actually send this résumé. */}
                   <div>
                     <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
-                    <div style={css("display:flex;flex-direction:column;gap:9px;")}>
+                    <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.companies.map((c, i) => (
                         <div
                           key={i}
@@ -2729,7 +2735,7 @@ export default function BurntCV() {
 
           {/* ===== PAYWALL ===== */}
           {screen === "paywall" && (
-            <div style={css("padding:26px 20px 40px;display:flex;flex-direction:column;gap:20px;")}>
+            <div className="bcv-screen bcv-narrow" style={css("padding:26px 20px 40px;display:flex;flex-direction:column;gap:20px;")}>
               <div style={css("text-align:center;")}>
                 <div style={css("font-size:42px;")}>{paywallEmoji}</div>
                 <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:12px 0 6px;")}>
@@ -2972,7 +2978,7 @@ export default function BurntCV() {
 
           {/* ===== SETTINGS ===== */}
           {screen === "settings" && (
-            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:20px;")}>
+            <div className="bcv-screen bcv-narrow" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:20px;")}>
               <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:0;")}>Settings</h2>
 
               <div style={css("background:#fff;border:1px solid rgba(15,6,35,.08);border-radius:16px;padding:17px;")}>
@@ -3142,7 +3148,7 @@ export default function BurntCV() {
 
           {/* ===== FEEDBACK ===== */}
           {screen === "feedback" && (
-            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px;")}>
+            <div className="bcv-screen bcv-narrow" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px;")}>
               <div>
                 <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:0 0 5px;")}>
                   Feedback
@@ -3157,7 +3163,7 @@ export default function BurntCV() {
 
           {/* ===== HISTORY ===== */}
           {screen === "history" && (
-            <div style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px;")}>
+            <div className="bcv-screen bcv-narrow" style={css("padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px;")}>
               <div>
                 <h2 style={css("font-size:26px;font-weight:900;letter-spacing:-.02em;margin:0 0 5px;")}>
                   Your roasts
@@ -3319,7 +3325,7 @@ function GlowList({ label, items, note }: { label: string; items: string[]; note
           {note}
         </p>
       )}
-      <div style={css("display:flex;flex-direction:column;gap:8px;")}>
+      <div className="bcv-grid2" style={css("display:flex;flex-direction:column;gap:8px;")}>
         {items.map((it, i) => (
           <div
             key={i}
