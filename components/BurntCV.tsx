@@ -62,6 +62,32 @@ type Screen =
   | "history"
   | "feedback";
 
+// Canned, deliberately roastable résumé for the "no résumé handy" chip — every
+// cliché the roast engine loves: task-language, buzzwords, zero numbers.
+const SAMPLE_RESUME = `Rahul Mehta
+Results-driven, passionate professional with a proven track record of leveraging synergies across cross-functional teams. Team player who also works independently.
+
+EXPERIENCE
+Senior Executive, Business Operations — Zenith Solutions (2021–present)
+- Responsible for various tasks related to project coordination and stakeholder management
+- Utilized Microsoft Office to complete deliverables and drive impactful outcomes
+- Helped improve the process that made reporting better across the organization
+- Worked with stakeholders on various strategic initiatives and key priorities
+- Spearheaded synergistic alignment between teams to deliver value-added solutions
+
+Operations Associate — BrightPath Consulting (2019–2021)
+- Handled customer queries and support in a fast-paced environment
+- Assisted senior management with day-to-day activities as required
+- Participated in weekly meetings and contributed innovative ideas
+
+SKILLS
+Microsoft Office, Communication, Leadership, Teamwork, Time Management, Familiar with Python
+
+EDUCATION
+MBA, General Management (2019)
+
+References available on request.`;
+
 const LOADING_MSGS = [
   "Reading between the lines…",
   "Sharpening the knife…",
@@ -455,6 +481,17 @@ export default function BurntCV() {
     },
     [toastMsg, scrollToIntensity],
   );
+
+  // Fill the box with the canned sample so a first visit can fire a roast
+  // without hunting for a file. Paste mode so the text is visible + editable.
+  const loadSample = useCallback(() => {
+    setInputMode("paste");
+    setIsLinkedIn(false);
+    setResumeText(SAMPLE_RESUME);
+    ev("sample_loaded");
+    toastMsg("Sample loaded — this one deserves it 🔥");
+    scrollToIntensity();
+  }, [toastMsg, scrollToIntensity]);
 
   // All personas & intensities are free to pick — you pay per roast, not per
   // feature. The gate is at "Roast it".
@@ -1166,7 +1203,7 @@ export default function BurntCV() {
           </div>
         </div>
 
-        <div ref={scrollRef} style={css("flex:1;overflow-y:auto;")}>
+        <div ref={scrollRef} className="bcv-scroll" style={css("flex:1;overflow-y:auto;")}>
           {/* ===== SETUP ===== */}
           {screen === "input" && (
             <>
@@ -1343,12 +1380,22 @@ export default function BurntCV() {
                     "width:100%;min-height:150px;resize:vertical;border:1.5px solid rgba(15,6,35,.12);border-radius:14px;padding:15px;font-size:14.5px;line-height:1.55;color:#222;background:#fff;",
                   )}
                 />
-                <div style={css("margin-top:-12px;")}>
+                <div style={css("margin-top:-12px;display:flex;align-items:center;justify-content:space-between;gap:10px;")}>
                   <span style={css("font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9c9c9c;")}>
                     {resumeText.trim().length < 40
                       ? "paste at least a few lines"
                       : resumeText.length + " chars · ready"}
                   </span>
+                  {!resumeText.trim() && (
+                    <button
+                      onClick={loadSample}
+                      style={css(
+                        "flex:none;border:1px solid rgba(78,49,136,.3);background:rgba(78,49,136,.05);color:#4e3188;cursor:pointer;font-size:11.5px;font-weight:800;padding:6px 12px;border-radius:999px;",
+                      )}
+                    >
+                      ✨ No résumé handy? Roast the sample
+                    </button>
+                  )}
                 </div>
                 </div>
 

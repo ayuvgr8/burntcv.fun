@@ -109,6 +109,13 @@ a {
 @media (min-width: 1024px) {
   .bcv-frame {
     max-width: 1080px !important;
+    /* `hidden` makes the frame a scroll container, which silently disables
+       position:sticky for descendants (the page scrolls at window level).
+       `clip` clips identically without the scroll-container semantics. */
+    overflow: clip !important;
+  }
+  .bcv-scroll {
+    overflow-y: visible !important;
   }
   .bcv-topbar {
     padding: 14px 28px !important;
@@ -151,6 +158,17 @@ a {
     flex-direction: column;
     gap: 22px;
     min-width: 0;
+  }
+  /* The pickers column becomes a sticky rail: capped to the viewport (below
+     the sticky top bar) and scrolling internally, so pain tolerance and
+     roasters stay reachable on short screens instead of scrolling away. */
+  .bcv-cols > .bcv-col:last-child {
+    position: sticky;
+    top: 78px;
+    max-height: calc(100vh - 98px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding-right: 4px;
   }
   /* Side-by-side CTA pair at the end of the Glow-Up. */
   .bcv-cta {
