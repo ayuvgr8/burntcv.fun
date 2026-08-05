@@ -15,6 +15,7 @@ export function ev(
     | "glowup_setup" // opened the role / JD screen (the step before paying)
     | "glowup_run"
     | "glowup_copy"
+    | "company_chip_click" // tapped a Where-To-Aim company → LinkedIn jobs
     | "purchase"
     | "byok_added",
   props?: Record<string, string | number | boolean>,
