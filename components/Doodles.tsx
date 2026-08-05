@@ -4,10 +4,10 @@
 // used as faint decorative accents in otherwise-empty desktop corners.
 // Hidden below 1024px via the .bcv-doodle class; pointer-events none always.
 
-function wrap(node: React.ReactNode, pos: string, size: number, rotate = 0) {
+function wrap(node: React.ReactNode, pos: string, size: number, rotate = 0, drift = false) {
   return (
     <span
-      className="bcv-doodle"
+      className={"bcv-doodle" + (drift ? " bcv-drift" : "")}
       aria-hidden
       style={{
         position: "absolute",
@@ -28,7 +28,7 @@ function wrap(node: React.ReactNode, pos: string, size: number, rotate = 0) {
 
 const stroke = { fill: "none", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-export function DoodlePlane({ pos, size = 74, rotate = 0, color = "#c9b8ef" }: { pos: string; size?: number; rotate?: number; color?: string }) {
+export function DoodlePlane({ pos, size = 74, rotate = 0, color = "#c9b8ef", drift = false }: { pos: string; size?: number; rotate?: number; color?: string; drift?: boolean }) {
   return wrap(
     <svg viewBox="0 0 64 64" width="100%" height="100%">
       <path {...stroke} stroke={color} d="M6 30 L56 12 L38 52 L30 36 Z" strokeDasharray="3 3" />
@@ -38,6 +38,7 @@ export function DoodlePlane({ pos, size = 74, rotate = 0, color = "#c9b8ef" }: {
     pos,
     size,
     rotate,
+    drift,
   );
 }
 

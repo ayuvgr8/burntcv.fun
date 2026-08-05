@@ -301,3 +301,77 @@ a {
   background: #0f0623 !important;
   color: #ffdd00 !important;
 }
+
+/* ===== Minimal motion (all gated on prefers-reduced-motion) ===== */
+@keyframes bcvFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+@keyframes bcvDrift {
+  0% {
+    transform: translate(-40px, 16px) rotate(-10deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.65;
+  }
+  85% {
+    opacity: 0.65;
+  }
+  100% {
+    transform: translate(230px, -34px) rotate(8deg);
+    opacity: 0;
+  }
+}
+@keyframes bcvRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Doodles bob gently; drifting ones (loading screens) fly across. */
+  .bcv-doodle svg {
+    animation: bcvFloat 5.5s ease-in-out infinite;
+  }
+  .bcv-drift svg {
+    animation: bcvDrift 4.8s ease-in-out infinite;
+  }
+  /* Screens marked .bcv-anim fade their sections up with a soft stagger. */
+  .bcv-anim > * {
+    opacity: 0;
+    animation: bcvRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .bcv-anim > *:nth-child(1) { animation-delay: 0.03s; }
+  .bcv-anim > *:nth-child(2) { animation-delay: 0.08s; }
+  .bcv-anim > *:nth-child(3) { animation-delay: 0.13s; }
+  .bcv-anim > *:nth-child(4) { animation-delay: 0.18s; }
+  .bcv-anim > *:nth-child(5) { animation-delay: 0.23s; }
+  .bcv-anim > *:nth-child(6) { animation-delay: 0.28s; }
+  .bcv-anim > *:nth-child(7) { animation-delay: 0.33s; }
+  .bcv-anim > *:nth-child(8) { animation-delay: 0.38s; }
+  .bcv-anim > *:nth-child(n + 9) { animation-delay: 0.44s; }
+}
+/* Cards lift a touch under the pointer (desktop, real hover only). */
+@media (hover: hover) and (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .bcv-grid2 > *,
+  .bcv-grid3 > *,
+  .bcv-hero > * {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .bcv-grid2 > *:hover,
+  .bcv-grid3 > *:hover,
+  .bcv-hero > *:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 26px -16px rgba(15, 6, 35, 0.35);
+  }
+}
