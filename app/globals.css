@@ -291,3 +291,13 @@ a {
 .bcv-step:hover {
   background: rgba(78, 49, 136, 0.05);
 }
+
+/* Company chips are live job-search links. */
+.bcv-chip {
+  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.bcv-chip:hover {
+  transform: translateY(-1px);
+  background: #0f0623 !important;
+  color: #ffdd00 !important;
+}

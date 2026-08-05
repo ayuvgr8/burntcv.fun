@@ -2676,10 +2676,11 @@ export default function BurntCV() {
 
                   {/* Projects to go build — each one earns a bullet this résumé
                       is missing. Tap a card to expand it. */}
-                  <div>
+                  <div style={css("position:relative;")}>
+                    <DoodleTarget pos="top:-18px;right:10px" size={56} rotate={-8} />
                     <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🛠 BUILD YOUR PROOF</div>
                     <p style={css("margin:0 0 10px;font-size:12.5px;color:#5a5a5a;line-height:1.45;")}>
-                      Projects that earn the bullets you can&apos;t write yet — tap one to see the play.
+                      Enterprise-weight projects that earn the bullets you can&apos;t write yet — tap one to see the play.
                     </p>
                     <div className="bcv-grid2 bcv-nospan" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.projects.map((p, i) => {
@@ -2741,9 +2742,14 @@ export default function BurntCV() {
                     </div>
                   </div>
 
-                  {/* Where to actually send this résumé. */}
-                  <div>
-                    <div style={css(GLOW_LABEL + "margin-bottom:10px;")}>🏢 WHERE TO AIM IT</div>
+                  {/* Where to actually send this résumé. Industry + stage per
+                      card, real company names as live job-search links. */}
+                  <div style={css("position:relative;")}>
+                    <DoodleBriefcase pos="top:-16px;right:8px" size={56} rotate={8} />
+                    <div style={css(GLOW_LABEL + "margin-bottom:4px;")}>🏢 WHERE TO AIM IT</div>
+                    <p style={css("margin:0 2px 10px;font-size:12.5px;color:#6a6a6a;line-height:1.45;")}>
+                      Industries where this profile wins, with real names — tap a company to see its openings ↗
+                    </p>
                     <div className="bcv-grid2 bcv-grid3" style={css("display:flex;flex-direction:column;gap:9px;")}>
                       {glowup.companies.map((c, i) => (
                         <div
@@ -2758,14 +2764,21 @@ export default function BurntCV() {
                           </div>
                           <div style={css("display:flex;flex-wrap:wrap;gap:6px;")}>
                             {c.examples.map((e, j) => (
-                              <span
+                              <a
                                 key={j}
+                                className="bcv-chip"
+                                href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(
+                                  `${e} ${targetRole.trim()}`.trim(),
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => ev("company_chip_click")}
                                 style={css(
-                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;",
+                                  "background:rgba(15,6,35,.05);color:#373737;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;",
                                 )}
                               >
-                                {e}
-                              </span>
+                                {e} ↗
+                              </a>
                             ))}
                           </div>
                         </div>
