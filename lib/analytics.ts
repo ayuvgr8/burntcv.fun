@@ -14,6 +14,11 @@ export function ev(
     | "glowup_setup" // opened the role / JD screen (the step before paying)
     | "glowup_run"
     | "glowup_copy"
+    // Live openings attached to a Glow-Up. jobs_loaded carries the result count
+    // and any degrade reason — the two numbers that say whether the feature is
+    // actually earning its ship criteria (docs/jobs-feed-spec.md §9).
+    | "jobs_loaded"
+    | "job_apply_click"
     | "purchase"
     | "byok_added",
   props?: Record<string, string | number | boolean>,

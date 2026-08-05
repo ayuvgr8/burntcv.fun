@@ -75,7 +75,16 @@ export async function budgetAvailable(): Promise<boolean> {
   if (redis) {
     try {
       const raw = await redis.get<string>(keyFor(day));
-      const micros = raw ? Number(raw) : 0;
+      const micros = Number(raw);
+      // A key that doesn't parse to a number must not read as "budget spent".
+      // `NaN < BUDGET_MICROS` is false, so the old `Number(raw)` result would
+      // have silently shut off the platform key — no roasts, no Glow-Ups —
+      // until UTC midnight, for any corrupt or unexpected value in the key.
+      // Treat unparseable as zero, consistent with the fail-open posture above.
+      if (!Number.isFinite(micros)) {
+        console.error("[spendcap] non-numeric counter, allowing:", raw);
+        return true;
+      }
       return micros < BUDGET_MICROS;
     } catch (err) {
       // Fail open — never let a limiter outage take roasting down.
