@@ -21,7 +21,19 @@ export async function GET(req: Request, { params }: Params) {
   const cand = await getCandidate(ctx.account.id, candId);
   if (!cand) return jsonError(404, "not_found");
   const role = await getRole(ctx.account.id, cand.roleId);
-  return NextResponse.json({ candidate: cand, role: role ? { id: role.id, title: role.title, requirements: role.requirements } : null });
+  return NextResponse.json({
+    candidate: cand,
+    role: role
+      ? {
+          id: role.id,
+          title: role.title,
+          requirements: role.requirements,
+          barVersion: role.barVersion ?? 1,
+        }
+      : null,
+    staleReport:
+      !!role && cand.stage === "scored" && (cand.barVersion ?? 1) !== (role.barVersion ?? 1),
+  });
 }
 
 // DELETE /api/hire/candidates/:candId — DPDP erasure: hard delete now,

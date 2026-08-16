@@ -21,6 +21,7 @@ export async function GET(req: Request, { params }: Params) {
   const role = await getRole(ctx.account.id, roleId);
   if (!role) return jsonError(404, "not_found");
   const cands = await listCandidates(ctx.account.id, roleId);
+  const barVersion = role.barVersion ?? 1;
   return NextResponse.json({
     role,
     candidates: cands.map((c) => ({
@@ -33,6 +34,9 @@ export async function GET(req: Request, { params }: Params) {
       confidence: c.fitReport?.confidence ?? null,
       knockoutFailures: c.fitReport?.knockoutFailures?.length ?? 0,
       needsReview: c.fitReport?.needsReview ?? false,
+      // Scored against an older version of the bar → the report no longer
+      // reflects the confirmed weights; the UI offers a rescore.
+      staleReport: c.stage === "scored" && (c.barVersion ?? 1) !== barVersion,
       decision: c.decision,
       createdAt: c.createdAt,
       purgeAfter: c.purgeAfter,

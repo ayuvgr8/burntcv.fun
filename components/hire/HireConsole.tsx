@@ -151,7 +151,14 @@ async function api<T>(
     body,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error || "request_failed");
+  if (!res.ok) {
+    // A dead/expired session anywhere in the app → clean sign-out, not a
+    // scatter of "could not load" errors. The root component listens.
+    if (res.status === 401 && opts.token) {
+      window.dispatchEvent(new Event("hire-unauthorized"));
+    }
+    throw new ApiError(res.status, (data as { error?: string }).error || "request_failed");
+  }
   return data as T;
 }
 
@@ -177,6 +184,7 @@ interface CandidateSummary {
   confidence: number | null;
   knockoutFailures: number;
   needsReview: boolean;
+  staleReport: boolean;
   decision: { outcome: DecisionOutcome } | null;
   createdAt: number;
   purgeAfter: number;
@@ -241,6 +249,17 @@ export default function HireConsole() {
     setToken(null);
     setView({ kind: "roles" });
   }, []);
+
+  // Session died mid-use (expired token, deleted account) → back to sign-in
+  // with a clear message instead of broken views.
+  useEffect(() => {
+    const onDead = () => {
+      signOut();
+      setBanner("Your session expired — sign in again to continue.");
+    };
+    window.addEventListener("hire-unauthorized", onDead);
+    return () => window.removeEventListener("hire-unauthorized", onDead);
+  }, [signOut]);
 
   if (!booted) {
     return (
@@ -401,10 +420,26 @@ function AuthView({
             <h1 style={css(`font-size:21px;font-weight:900;letter-spacing:-.02em;margin:12px 0 8px;color:${INK};`)}>
               Check your email
             </h1>
-            <p style={css(`font-size:14px;line-height:1.6;color:${MUTED};margin:0;`)}>
+            <p style={css(`font-size:14px;line-height:1.6;color:${MUTED};margin:0 0 18px;`)}>
               We sent a sign-in link to <strong>{email}</strong>. It works once and
-              expires in 15 minutes.
+              expires in 15 minutes. Nothing arriving? Check spam, then resend.
             </p>
+            <div style={css("display:flex;gap:8px;flex-wrap:wrap;")}>
+              <Btn
+                kind="ghost"
+                small
+                onClick={() => {
+                  setSent(false);
+                  submit();
+                }}
+                disabled={busy}
+              >
+                {busy ? "Sending…" : "Resend link"}
+              </Btn>
+              <Btn kind="ghost" small onClick={() => setSent(false)}>
+                Use a different email
+              </Btn>
+            </div>
           </>
         ) : (
           <>
@@ -470,13 +505,38 @@ function RolesView({
 }) {
   const [roles, setRoles] = useState<RoleSummary[] | null>(null);
   const [usage, setUsage] = useState<{ screensUsed: number; limits: { screensPerMonth: number } } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [orgEdit, setOrgEdit] = useState(orgName);
+  const [retentionEdit, setRetentionEdit] = useState(180);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   useEffect(() => {
     api<{ roles: RoleSummary[] }>("/roles", { token }).then((r) => setRoles(r.roles)).catch(() => setRoles([]));
-    api<{ usage: { screensUsed: number; limits: { screensPerMonth: number } } }>("/account", { token })
-      .then((r) => setUsage(r.usage))
+    api<{
+      account: { orgName: string; retentionDays: number };
+      usage: { screensUsed: number; limits: { screensPerMonth: number } };
+    }>("/account", { token })
+      .then((r) => {
+        setUsage(r.usage);
+        setOrgEdit(r.account.orgName);
+        setRetentionEdit(r.account.retentionDays);
+      })
       .catch(() => {});
   }, [token]);
+
+  const saveSettings = async () => {
+    try {
+      await api("/account", {
+        token,
+        method: "PATCH",
+        body: { orgName: orgEdit, retentionDays: Number(retentionEdit) },
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 2000);
+    } catch {
+      /* non-fatal; the form keeps its values for retry */
+    }
+  };
 
   const deleteAll = async () => {
     if (
@@ -552,7 +612,46 @@ function RolesView({
         </div>
       )}
 
-      <div style={css("margin:40px 0 0;display:flex;justify-content:flex-end;")}>
+      {/* ---- workspace settings + data controls ---- */}
+      <div style={css("margin:40px 0 0;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;")}>
+        <div style={css("flex:1;min-width:280px;")}>
+          <button
+            onClick={() => setSettingsOpen((v) => !v)}
+            style={css(
+              `border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:800;color:${MUTED};padding:0;`,
+            )}
+          >
+            {settingsOpen ? "▾" : "▸"} Workspace settings
+          </button>
+          {settingsOpen && (
+            <div style={css(`margin:12px 0 0;background:#fff;border:1px solid ${LINE};border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;max-width:440px;`)}>
+              <div>
+                <MonoLabel>Team / org name</MonoLabel>
+                <input value={orgEdit} onChange={(e) => setOrgEdit(e.target.value)} style={css(inputStyle)} />
+              </div>
+              <div>
+                <MonoLabel>Candidate data retention (days, 7–365)</MonoLabel>
+                <input
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={retentionEdit}
+                  onChange={(e) => setRetentionEdit(Number(e.target.value))}
+                  style={css(inputStyle + "width:140px;")}
+                />
+                <div style={css(`font-size:11.5px;line-height:1.5;color:${FAINT};margin:6px 0 0;`)}>
+                  Applies to candidates added from now on; existing candidates keep the
+                  deadline set at intake. Data hard-deletes automatically at the deadline.
+                </div>
+              </div>
+              <div style={css("display:flex;align-items:center;gap:10px;")}>
+                <Btn small onClick={saveSettings}>
+                  {settingsSaved ? "Saved ✓" : "Save settings"}
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
         <Btn kind="danger" small onClick={deleteAll}>
           Delete all workspace data
         </Btn>
@@ -740,6 +839,37 @@ function RoleView({
     onBack();
   };
 
+  // Close = stop accepting candidates (screening data stays until retention);
+  // reopen resumes intake. Server enforces it — this just drives the toggle.
+  const toggleStatus = async () => {
+    if (!role) return;
+    const next = role.status === "OPEN" ? "CLOSED" : "OPEN";
+    if (
+      next === "CLOSED" &&
+      !window.confirm(
+        "Close this role? No new candidates can be added while closed (existing reports stay).",
+      )
+    )
+      return;
+    await api(`/roles/${roleId}`, { method: "PATCH", token, body: { status: next } });
+    await load();
+  };
+
+  // Bar changed after scoring → re-run rating + verdict off the stored
+  // extraction, then let the auto-driver take it to "scored" again.
+  const rescore = async (candId: string) => {
+    try {
+      await api(`/candidates/${candId}/rescore`, { token, method: "POST", body: {} });
+      await load(); // the drive effect picks the candidate up from "extracted"
+    } catch (e) {
+      setErr(
+        e instanceof ApiError && e.message === "rate_limited"
+          ? "Too many requests — try the rescore again in a minute."
+          : "Rescore failed — try again.",
+      );
+    }
+  };
+
   if (!role) {
     return <div style={css(`color:${FAINT};font-size:14px;`)}>{err ?? "Loading role…"}</div>;
   }
@@ -761,10 +891,25 @@ function RoleView({
             {knockouts > 0 ? ` · ${knockouts} knockout${knockouts === 1 ? "" : "s"}` : ""}
           </div>
         </div>
-        <Btn kind="danger" small onClick={deleteRole}>
-          Delete role
-        </Btn>
+        <div style={css("display:flex;gap:8px;align-items:center;flex-wrap:wrap;")}>
+          {role.status === "CLOSED" && <Chip text="Closed" fg={MUTED} bg="rgba(16,24,40,.06)" />}
+          <Btn kind="ghost" small onClick={toggleStatus}>
+            {role.status === "OPEN" ? "Close role" : "Reopen role"}
+          </Btn>
+          <Btn kind="danger" small onClick={deleteRole}>
+            Delete role
+          </Btn>
+        </div>
       </div>
+      {err && (
+        <div
+          style={css(
+            "background:rgba(181,71,8,.08);border:1px solid rgba(181,71,8,.25);color:#b54708;border-radius:12px;padding:11px 15px;font-size:13px;font-weight:600;margin:0 0 16px;",
+          )}
+        >
+          {err}
+        </div>
+      )}
 
       {role.decompositionNotes && !role.confirmed && (
         <div
@@ -943,6 +1088,8 @@ function RoleView({
           cands={cands}
           onAdded={() => load()}
           onOpen={onOpenCandidate}
+          onRescore={rescore}
+          onResume={(id) => void drive(id)}
         />
       </div>
     </>
@@ -957,12 +1104,16 @@ function CandidatesSection({
   cands,
   onAdded,
   onOpen,
+  onRescore,
+  onResume,
 }: {
   token: string;
   role: Role;
   cands: CandidateSummary[];
   onAdded: () => void;
   onOpen: (candId: string) => void;
+  onRescore: (candId: string) => void;
+  onResume: (candId: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -1016,7 +1167,7 @@ function CandidatesSection({
           <span style={css(`font-weight:600;font-size:13px;color:${FAINT};`)}>({cands.length})</span>
         </div>
         {!adding && (
-          <Btn small onClick={() => setAdding(true)} disabled={!role.confirmed}>
+          <Btn small onClick={() => setAdding(true)} disabled={!role.confirmed || role.status !== "OPEN"}>
             + Add candidate
           </Btn>
         )}
@@ -1025,6 +1176,12 @@ function CandidatesSection({
         <div style={css(`font-size:13px;color:#b54708;font-weight:600;`)}>
           Confirm the hiring bar above before adding candidates — the recruiter
           defines what matters, then the AI evaluates against it.
+        </div>
+      )}
+      {role.confirmed && role.status === "CLOSED" && (
+        <div style={css(`font-size:13px;color:${MUTED};font-weight:600;`)}>
+          This role is closed — no new candidates can be added. Existing reports and
+          decisions stay available until retention. Reopen the role to resume intake.
         </div>
       )}
 
@@ -1083,6 +1240,7 @@ function CandidatesSection({
               Cancel
             </Btn>
           </div>
+          <CandidateNotice />
         </div>
       )}
 
@@ -1093,9 +1251,12 @@ function CandidatesSection({
           return (
             <div
               key={c.id}
-              onClick={() => (c.stage === "scored" || c.stage === "review" ? onOpen(c.id) : undefined)}
+              onClick={() =>
+                c.stage === "scored" || c.stage === "review" ? onOpen(c.id) : onResume(c.id)
+              }
+              title={running ? "Click to resume screening if it looks stuck" : undefined}
               style={css(
-                `border-top:1px solid ${LINE};padding:14px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;cursor:${running ? "default" : "pointer"};`,
+                `border-top:1px solid ${LINE};padding:14px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;cursor:pointer;`,
               )}
             >
               <div style={css("display:flex;align-items:center;gap:11px;flex-wrap:wrap;")}>
@@ -1110,6 +1271,9 @@ function CandidatesSection({
                 {c.knockoutFailures > 0 && (
                   <Chip text={`${c.knockoutFailures} knockout flag${c.knockoutFailures === 1 ? "" : "s"}`} fg="#b42318" bg="rgba(180,35,24,.08)" />
                 )}
+                {c.staleReport && (
+                  <Chip text="Bar changed since scoring" fg="#b54708" bg="rgba(181,71,8,.1)" />
+                )}
                 {c.decision && (
                   <Chip
                     text={`Decided: ${c.decision.outcome}`}
@@ -1118,7 +1282,22 @@ function CandidatesSection({
                   />
                 )}
               </div>
-              {!running && <span style={css(`color:${FAINT};font-size:16px;`)}>→</span>}
+              <div style={css("display:flex;align-items:center;gap:10px;")}>
+                {c.staleReport && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRescore(c.id);
+                    }}
+                    style={css(
+                      "border:1px solid rgba(181,71,8,.35);background:rgba(181,71,8,.06);cursor:pointer;font-family:inherit;font-weight:800;font-size:12px;color:#b54708;padding:6px 12px;border-radius:9px;",
+                    )}
+                  >
+                    ↻ Rescore with new bar
+                  </button>
+                )}
+                {!running && <span style={css(`color:${FAINT};font-size:16px;`)}>→</span>}
+              </div>
             </div>
           );
         })}
@@ -1129,6 +1308,61 @@ function CandidatesSection({
         )}
       </div>
     </Card>
+  );
+}
+
+// The candidate-facing transparency notice (PRD-Hire §15.6): what a recruiter
+// should tell applicants when AI assists the screen. Copy-ready, so doing the
+// right thing costs one click.
+function CandidateNotice() {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const NOTICE =
+    "As part of screening for this role, we use AI-assisted software to compare " +
+    "résumés against the role's requirements. It highlights evidence for a human " +
+    "recruiter — every decision is made by a person, never by the software. Your " +
+    "data is used only for this role's screening, is never used to train AI " +
+    "models, and is deleted on a fixed retention schedule or earlier on request. " +
+    "To access or delete your data, contact the recruiting team for this role.";
+
+  return (
+    <div style={css(`border-top:1px solid ${LINE};padding:10px 0 0;`)}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={css(
+          `border:none;background:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:${MUTED};padding:0;`,
+        )}
+      >
+        {open ? "▾" : "▸"} What should candidates be told? (transparency notice)
+      </button>
+      {open && (
+        <div style={css("margin:8px 0 0;")}>
+          <div
+            style={css(
+              `background:rgba(16,24,40,.03);border:1px solid ${LINE};border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.6;color:${MUTED};`,
+            )}
+          >
+            {NOTICE}
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(NOTICE).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
+            }}
+            style={css(
+              `margin:8px 0 0;border:1px solid rgba(16,24,40,.14);background:#fff;cursor:pointer;font-family:inherit;font-weight:800;font-size:12px;color:${INK};padding:7px 12px;border-radius:8px;`,
+            )}
+          >
+            {copied ? "Copied ✓" : "Copy notice"}
+          </button>
+          <span style={css(`font-size:11.5px;color:${FAINT};margin-left:10px;`)}>
+            Paste it into your job post or application acknowledgment email.
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1147,6 +1381,7 @@ function CandidateView({
   const [reqs, setReqs] = useState<Requirement[]>([]);
   const [roleTitle, setRoleTitle] = useState("");
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -1155,11 +1390,13 @@ function CandidateView({
     const res = await api<{
       candidate: Candidate;
       role: { id: string; title: string; requirements: Requirement[] } | null;
+      staleReport: boolean;
     }>(`/candidates/${candId}`, { token });
     setCand(res.candidate);
     setReqs(res.role?.requirements ?? []);
     setRoleTitle(res.role?.title ?? "");
     setRoleId(res.role?.id ?? null);
+    setStale(!!res.staleReport);
     setNote(res.candidate.decision?.note ?? "");
   }, [candId, token]);
 
@@ -1232,6 +1469,36 @@ function CandidateView({
           </Btn>
         </div>
       </div>
+
+      {stale && (
+        <div
+          style={css(
+            "background:rgba(181,71,8,.07);border:1px solid rgba(181,71,8,.25);border-radius:12px;padding:13px 16px;margin:0 0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;",
+          )}
+        >
+          <span style={css("font-size:13.5px;line-height:1.5;color:#b54708;font-weight:600;")}>
+            The hiring bar was edited after this report was scored — the numbers below
+            reflect the <em>previous</em> weights.
+          </span>
+          <button
+            onClick={async () => {
+              if (busy) return;
+              setBusy(true);
+              try {
+                await api(`/candidates/${candId}/rescore`, { token, method: "POST", body: {} });
+                onBack(roleId); // the role view auto-drives the re-run
+              } finally {
+                setBusy(false);
+              }
+            }}
+            style={css(
+              "border:none;background:#b54708;cursor:pointer;font-family:inherit;font-weight:800;font-size:12.5px;color:#fff;padding:9px 15px;border-radius:9px;white-space:nowrap;",
+            )}
+          >
+            ↻ Rescore with the new bar
+          </button>
+        </div>
+      )}
 
       {cand.stage === "review" ? (
         <Card>

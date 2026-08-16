@@ -77,6 +77,27 @@ export async function PUT(req: Request, { params }: Params) {
     });
   }
 
+  // Editing an ALREADY-confirmed bar bumps the version: existing fit reports
+  // were computed against the old weights and must surface as stale rather
+  // than silently pretending to reflect the new bar. First confirm stays v1.
+  const changed =
+    next.length !== role.requirements.length ||
+    next.some((r) => {
+      const prev = role.requirements.find((p) => p.id === r.id);
+      return (
+        !prev ||
+        prev.label !== r.label ||
+        prev.category !== r.category ||
+        prev.weight !== r.weight ||
+        prev.isKnockout !== r.isKnockout ||
+        prev.detail !== r.detail
+      );
+    });
+  if (role.confirmed && changed) {
+    role.barVersion = (role.barVersion ?? 1) + 1;
+  } else {
+    role.barVersion = role.barVersion ?? 1;
+  }
   role.requirements = next;
   role.confirmed = true;
   await saveRole(role);

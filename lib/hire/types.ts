@@ -54,6 +54,10 @@ export interface Role {
   decompositionNotes: string;
   requirements: Requirement[];
   confirmed: boolean; // recruiter has reviewed/edited weights — scoring is gated on this
+  // Bumped every time the CONFIRMED bar is edited again. Candidates record the
+  // version they were scored against, so a report can never silently drift
+  // from the weights it claims to reflect (absent on old records → 1).
+  barVersion?: number;
   status: RoleStatus;
   createdBy: string; // email of the recruiter
   createdAt: number;
@@ -176,6 +180,7 @@ export interface Candidate {
   decision: HireDecision | null;
   consent: ConsentInfo;
   modelVersions: Record<string, string>; // stage → model, accumulated as the pipeline runs
+  barVersion?: number; // the Role.barVersion this candidate's report was scored against
   createdAt: number;
   purgeAfter: number; // epoch ms — retention deadline, enforced via storage TTL + lazy filter
 }

@@ -108,6 +108,7 @@ export async function advanceCandidate(role: Role, cand: Candidate): Promise<Adv
         }
       }
 
+      cand.barVersion = role.barVersion ?? 1;
       cand.fitReport = {
         overallScore: verdict.overallScore,
         band: verdict.band,
