@@ -106,9 +106,15 @@ export default function Footer() {
                 {l.label}
               </Link>
             ))}
-            {/* Feedback navigates to the real page (not the policy pop-up). */}
+            {/* Feedback + product links navigate to their real pages (not the policy pop-up). */}
             <Link href="/feedback" style={css("color:#5a5a5a;cursor:pointer;")}>
               Feedback
+            </Link>
+            <Link href="/pro" style={css("color:#ed3237;cursor:pointer;")}>
+              BurntCV Pro
+            </Link>
+            <Link href="/hire" style={css("color:#1a56db;cursor:pointer;")}>
+              BurntCV Hire
             </Link>
           </nav>
         </div>

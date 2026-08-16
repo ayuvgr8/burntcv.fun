@@ -5,7 +5,13 @@ import { validate, vEnum } from "@/lib/validate";
 
 export const runtime = "nodejs";
 
-const CREEM_KINDS: readonly CreemKind[] = ["pass", "glowup", "glowup_topup"];
+const CREEM_KINDS: readonly CreemKind[] = [
+  "pass",
+  "glowup",
+  "glowup_topup",
+  "pro_pack",
+  "pro_pass",
+];
 const checkoutSchema = { kind: vEnum(CREEM_KINDS, { optional: true, default: "pass" }) };
 
 // Start an international purchase — returns a Creem hosted-checkout URL the
@@ -33,7 +39,12 @@ export async function POST(req: Request) {
   }
 
   const origin = new URL(req.url).origin;
-  const checkout = await createCheckout(kind, `${origin}/?creem=success&kind=${kind}`);
+  // Pro purchases return to the Pro page; roast purchases to the roast.
+  const returnPath = kind === "pro_pack" || kind === "pro_pass" ? "/pro" : "/";
+  const checkout = await createCheckout(
+    kind,
+    `${origin}${returnPath}?creem=success&kind=${kind}`,
+  );
   if (!checkout) {
     return NextResponse.json({ error: "checkout_failed" }, { status: 502 });
   }

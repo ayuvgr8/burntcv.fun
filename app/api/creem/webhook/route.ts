@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyCreemWebhook, extractEmail, kindOf } from "@/lib/creem";
 import { ensurePassForOrder } from "@/lib/entitlements";
+import { ensureProForOrder } from "@/lib/pro/entitlements";
 
 export const runtime = "nodejs";
 
@@ -34,16 +35,24 @@ export async function POST(req: Request) {
     if (kind === "checkout.completed") {
       const obj = (event.object || event.data || {}) as Record<string, unknown>;
       const checkoutId = String(obj.id || obj.checkout_id || "");
-      // Only the Pass grants a durable entitlement. Glow-Up purchases are one-off
-      // and consumed client-side, so we never mint anything for them here. Derive
-      // the product server-side; ignore anything that isn't positively the Pass.
-      if (checkoutId && kindOf(obj) === "pass") {
+      // Durable entitlements: the roast Pass and the two Pro products. Glow-Up
+      // purchases are one-off and consumed client-side — never minted here.
+      // Derive the product server-side; ignore anything unrecognised.
+      const productKind = checkoutId ? kindOf(obj) : null;
+      if (productKind === "pass") {
         await ensurePassForOrder({
           orderId: `creem:${checkoutId}`,
           email: extractEmail(obj),
           region: "INTL",
         });
         console.log("[creem webhook] pass granted for", checkoutId);
+      } else if (productKind === "pro_pack" || productKind === "pro_pass") {
+        await ensureProForOrder({
+          orderId: `creem:${checkoutId}`,
+          plan: productKind,
+          email: extractEmail(obj),
+        });
+        console.log(`[creem webhook] ${productKind} granted for`, checkoutId);
       }
     }
   } catch (err) {

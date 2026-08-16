@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { retrieveCheckout } from "@/lib/creem";
 import { ensurePassForOrder } from "@/lib/entitlements";
+import { ensureProForOrder } from "@/lib/pro/entitlements";
 import { ipFrom, limitAuth, recordAuthFailure, recordAuthSuccess } from "@/lib/ratelimit";
 import { parseJsonBody, vString } from "@/lib/validate";
 
@@ -58,6 +59,18 @@ export async function POST(req: Request) {
   if (co.kind === "glowup" || co.kind === "glowup_topup") {
     // One-off unlock — the Glow-Up itself runs client-side after this confirms.
     return NextResponse.json({ ok: true, kind: co.kind });
+  }
+
+  if (co.kind === "pro_pack" || co.kind === "pro_pass") {
+    // Pro purchase → mint the same credit/pass entitlement a Razorpay pro
+    // purchase would (idempotent per checkout; the webhook is the net).
+    // Namespaced ref so Creem checkouts never collide with Razorpay orders.
+    const pro = await ensureProForOrder({
+      orderId: `creem:${co.id}`,
+      plan: co.kind,
+      email: co.email,
+    });
+    return NextResponse.json({ ok: true, kind: co.kind, pro });
   }
 
   // Namespace the ref so Creem checkouts never collide with Razorpay orders.
