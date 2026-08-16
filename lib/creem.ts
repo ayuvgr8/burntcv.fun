@@ -13,11 +13,19 @@
 // the checkout's product id (never from a client-sent hint), so a $4.99/$3.99
 // Glow-Up can't be redeemed as a $9.99 Pass.
 //
+// BurntCV Pro sells internationally through the same rail (see docs/pro.md —
+// the ₹49 single is below the $4.99 fee floor, so intl offers pack + pass only):
+//   • Pro 5-report pack ($4.99)  → mints the same credit entitlement a Razorpay
+//     pro_pack does (lib/pro/entitlements.ts).
+//   • Pro 7-day pass ($7.99)     → same, time-window entitlement.
+//
 // Env:
 //   CREEM_API_KEY                 (creem_test_… → test API; creem_live_… → prod)
 //   CREEM_PRODUCT_ID              the "$9.99 6-Month Pass" product
 //   CREEM_GLOWUP_PRODUCT_ID       the "$4.99 Glow-Up" product
 //   CREEM_GLOWUP_TOPUP_PRODUCT_ID the "$3.99 Glow-Up top-up" product
+//   CREEM_PRO_PACK_PRODUCT_ID     the "$4.99 Pro 5-report pack" product
+//   CREEM_PRO_PASS_PRODUCT_ID     the "$7.99 Pro 7-day pass" product
 //   CREEM_WEBHOOK_SECRET          signs the checkout.completed webhook
 
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -26,6 +34,8 @@ const API_KEY = process.env.CREEM_API_KEY || "";
 const PASS_PRODUCT_ID = process.env.CREEM_PRODUCT_ID || "";
 const GLOWUP_PRODUCT_ID = process.env.CREEM_GLOWUP_PRODUCT_ID || "";
 const GLOWUP_TOPUP_PRODUCT_ID = process.env.CREEM_GLOWUP_TOPUP_PRODUCT_ID || "";
+const PRO_PACK_PRODUCT_ID = process.env.CREEM_PRO_PACK_PRODUCT_ID || "";
+const PRO_PASS_PRODUCT_ID = process.env.CREEM_PRO_PASS_PRODUCT_ID || "";
 const WEBHOOK_SECRET = process.env.CREEM_WEBHOOK_SECRET || "";
 
 // Test and live are fully isolated environments with separate base URLs.
@@ -33,11 +43,13 @@ const BASE = API_KEY.startsWith("creem_test_")
   ? "https://test-api.creem.io/v1"
   : "https://api.creem.io/v1";
 
-export type CreemKind = "pass" | "glowup" | "glowup_topup";
+export type CreemKind = "pass" | "glowup" | "glowup_topup" | "pro_pack" | "pro_pass";
 
 function productFor(kind: CreemKind): string {
   if (kind === "glowup") return GLOWUP_PRODUCT_ID;
   if (kind === "glowup_topup") return GLOWUP_TOPUP_PRODUCT_ID;
+  if (kind === "pro_pack") return PRO_PACK_PRODUCT_ID;
+  if (kind === "pro_pass") return PRO_PASS_PRODUCT_ID;
   return PASS_PRODUCT_ID;
 }
 
@@ -133,11 +145,20 @@ export function kindOf(o: Record<string, unknown> | null | undefined): CreemKind
   const pid = extractProductId(o);
   if (pid && GLOWUP_TOPUP_PRODUCT_ID && pid === GLOWUP_TOPUP_PRODUCT_ID) return "glowup_topup";
   if (pid && GLOWUP_PRODUCT_ID && pid === GLOWUP_PRODUCT_ID) return "glowup";
+  if (pid && PRO_PACK_PRODUCT_ID && pid === PRO_PACK_PRODUCT_ID) return "pro_pack";
+  if (pid && PRO_PASS_PRODUCT_ID && pid === PRO_PASS_PRODUCT_ID) return "pro_pass";
   if (pid && PASS_PRODUCT_ID && pid === PASS_PRODUCT_ID) return "pass";
   // No product-id match (e.g. field shape differs) → trust the metadata echo.
   const meta = (o as { metadata?: { kind?: unknown } }).metadata;
   const mk = meta?.kind;
-  if (mk === "glowup" || mk === "glowup_topup" || mk === "pass") return mk;
+  if (
+    mk === "glowup" ||
+    mk === "glowup_topup" ||
+    mk === "pass" ||
+    mk === "pro_pack" ||
+    mk === "pro_pass"
+  )
+    return mk;
   return null;
 }
 

@@ -63,6 +63,26 @@ Résumés are processed **in memory and never persisted**. PDF text extraction h
 server-side and is discarded after the roast. History stores the roast output only —
 never the raw document.
 
+## BurntCV Pro (beat the screen — `/pro`)
+
+The candidate-side match report: paste a JD + your résumé, see how an AI
+screener scores you against that role — per-requirement evidence, auto-filter
+warnings, honest fixes (rephrase / add-if-true / real gap — never fabrication).
+Fully **stateless**: the browser carries the intermediates between stage calls,
+the server computes and forgets, so the "never stored" promise above applies to
+Pro verbatim. Same engine as Hire below — candidate-side is the wedge,
+recruiter-side is the expansion. Details: [docs/pro.md](./docs/pro.md).
+
+## BurntCV Hire (AI Recruiting — `/hire`)
+
+The recruiter-side sibling product: paste a JD, screen candidates, get
+evidence-cited per-requirement fit reports — the LLM extracts evidence, pure
+code computes the verdict with the recruiter's confirmed weights, and a human
+records every decision. Fully walled from the roast (separate `hire:` data
+plane; the "never stored" promise above applies to the roast only — Hire's own
+promise lives at `/hire/privacy`). Architecture, pipeline, compliance and env
+vars: [docs/hire.md](./docs/hire.md).
+
 ## Production hardening (shipped)
 
 - **Durable rate limiting** — per-IP daily limits via **Upstash Redis** when

@@ -18,6 +18,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     page("", 1),
     page("/linkedin", 0.9),
+    page("/pro", 0.9),
+    page("/hire", 0.9),
+    page("/hire/privacy", 0.3, "yearly"),
     page("/terms", 0.3, "yearly"),
     page("/privacy", 0.3, "yearly"),
     page("/refund", 0.3, "yearly"),

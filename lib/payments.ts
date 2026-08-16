@@ -8,13 +8,24 @@
 //   RAZORPAY_KEY_SECRET           (server — signs & verifies orders)
 // Without NEXT_PUBLIC_RAZORPAY_KEY_ID the app simulates a successful purchase.
 
-export type Plan = "single" | "topup" | "glowup" | "lifetime";
+export type Plan =
+  | "single"
+  | "topup"
+  | "glowup"
+  | "lifetime"
+  // BurntCV Pro (per-use / short pass — never monthly, see docs/pro.md):
+  | "pro_single"
+  | "pro_pack"
+  | "pro_pass";
 
 export const PRICES: Record<Plan, { rupees: number; label: string }> = {
   single: { rupees: 7, label: "One roast" }, // free user, past their freebie
   topup: { rupees: 5, label: "Extra roast" }, // lifetime user, past today's 5
   glowup: { rupees: 49, label: "The Glow-Up rewrite" }, // 4 free on the Pass, then ₹49
   lifetime: { rupees: 199, label: "6-Month Pass · 5/day + 4 Glow-Ups" },
+  pro_single: { rupees: 49, label: "Pro · 1 match report" },
+  pro_pack: { rupees: 149, label: "Pro · 5 match reports" },
+  pro_pass: { rupees: 299, label: "Pro · 7-day unlimited pass" },
 };
 
 export interface PassEntitlement {
@@ -24,10 +35,20 @@ export interface PassEntitlement {
   glowupsLeft?: number; // Glow-Up rewrites remaining on this Pass
 }
 
+// A minted Pro entitlement (credits or the 7-day pass) — server-verified.
+export interface ProEntitlement {
+  code: string;
+  plan: "pro_single" | "pro_pack" | "pro_pass";
+  creditsLeft: number;
+  passUntil: number; // 0 for credit plans
+  token: string;
+}
+
 export interface PurchaseResult {
   ok: boolean;
   simulated: boolean;
   pass?: PassEntitlement | null; // present for a verified Pass purchase
+  pro?: ProEntitlement | null; // present for a verified Pro purchase
 }
 
 interface RazorpayInstance {
@@ -111,7 +132,12 @@ export async function purchase(plan: Plan): Promise<PurchaseResult> {
             body: JSON.stringify({ ...resp, plan }),
           });
           const data = await v.json();
-          resolve({ ok: !!data.ok, simulated: false, pass: data.pass ?? null });
+          resolve({
+            ok: !!data.ok,
+            simulated: false,
+            pass: data.pass ?? null,
+            pro: data.pro ?? null,
+          });
         } catch {
           resolve({ ok: false, simulated: false });
         }
@@ -193,7 +219,7 @@ export async function fetchRegion(): Promise<"IN" | "INTL"> {
   }
 }
 
-export type CreemKind = "pass" | "glowup" | "glowup_topup";
+export type CreemKind = "pass" | "glowup" | "glowup_topup" | "pro_pack" | "pro_pass";
 
 // Start a Creem hosted checkout → redirects the browser to Creem. `kind` picks
 // the product: the $9.99 Pass, the $4.99 one-off Glow-Up, or the $3.99 Glow-Up
@@ -221,6 +247,7 @@ export interface CreemClaim {
   ok: boolean;
   kind?: CreemKind; // server-verified product that was actually paid for
   pass?: PassEntitlement | null; // present only for a Pass purchase
+  pro?: ProEntitlement | null; // present only for a Pro purchase
 }
 
 // On return from Creem, confirm payment server-side. The server re-verifies the
@@ -239,6 +266,7 @@ export async function claimCreem(checkoutId: string): Promise<CreemClaim> {
       ok: !!data.ok,
       kind: data.kind as CreemKind | undefined,
       pass: (data.pass as PassEntitlement) ?? null,
+      pro: (data.pro as ProEntitlement) ?? null,
     };
   } catch {
     return { ok: false };

@@ -41,6 +41,11 @@ export interface ClaudeResult {
   usage: ClaudeUsage;
 }
 
+export interface CallExtras {
+  system?: string; // system prompt (Hire pipeline uses strict-JSON contracts)
+  temperature?: number; // low temp for deterministic extraction/rating
+}
+
 // One raw Messages request against either endpoint. Throws `anthropic_<status>:…`
 // on non-2xx, `timeout` on abort. `via` is only for the usage log line.
 async function dispatch(
@@ -50,6 +55,7 @@ async function dispatch(
   prompt: string,
   maxTokens: number,
   via: string,
+  extras: CallExtras = {},
 ): Promise<ClaudeResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -68,6 +74,10 @@ async function dispatch(
         model,
         max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
+        ...(extras.system ? { system: extras.system } : {}),
+        ...(typeof extras.temperature === "number"
+          ? { temperature: extras.temperature }
+          : {}),
       }),
     });
   } catch (err) {
@@ -112,9 +122,12 @@ async function dispatch(
 
 export async function callClaude(
   prompt: string,
-  opts: { apiKey: string; model?: string; maxTokens?: number } = { apiKey: "" },
+  opts: { apiKey: string; model?: string; maxTokens?: number } & CallExtras = {
+    apiKey: "",
+  },
 ): Promise<ClaudeResult> {
   const maxTokens = opts.maxTokens ?? 1024;
+  const extras: CallExtras = { system: opts.system, temperature: opts.temperature };
   const byok = opts.apiKey || "";
   const gatewayKey = process.env.AI_GATEWAY_API_KEY || "";
   const directKey = process.env.ANTHROPIC_API_KEY || "";
@@ -128,6 +141,7 @@ export async function callClaude(
       prompt,
       maxTokens,
       "byok",
+      extras,
     );
   }
 
@@ -142,6 +156,7 @@ export async function callClaude(
         prompt,
         maxTokens,
         "gateway",
+        extras,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
@@ -156,6 +171,7 @@ export async function callClaude(
           prompt,
           maxTokens,
           "direct-fallback",
+          extras,
         );
       }
       throw err;
@@ -171,5 +187,6 @@ export async function callClaude(
     prompt,
     maxTokens,
     "direct",
+    extras,
   );
 }

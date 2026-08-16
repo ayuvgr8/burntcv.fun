@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { css } from "./css";
 import Footer from "./Footer";
 import LetterReveal from "./LetterReveal";
+import ProductMenu from "./ProductMenu";
 import { PERSONAS, INTENSITIES } from "@/lib/roast";
 
 // ---------------------------------------------------------------------------
@@ -226,7 +227,8 @@ export default function Landing({
             </div>
           </div>
         </div>
-        <div style={css("display:flex;align-items:center;gap:18px;")}>
+        <div style={css("display:flex;align-items:center;gap:14px;")}>
+          <ProductMenu />
           <button
             onClick={onRoast}
             className="bcv-navcta"

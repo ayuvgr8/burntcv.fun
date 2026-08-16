@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PRO_PLANS } from "@/lib/pro/entitlements";
 import { ipFrom, limitPublic, rateLimitedResponse } from "@/lib/ratelimit";
 import { parseJsonBody, vEnum } from "@/lib/validate";
 
@@ -9,6 +10,11 @@ const PRICE_PAISE: Record<string, number> = {
   topup: 500, // ₹5 — lifetime user, extra roast past today's 5
   glowup: 4900, // ₹49 — the Glow-Up rewrite (4 included with the Pass, then ₹49)
   lifetime: 19900, // ₹199
+  // BurntCV Pro (per-use / short pass — see docs/pro.md). Same rail, its own
+  // entitlement layer (lib/pro/entitlements.ts); amounts env-overridable there.
+  pro_single: PRO_PLANS.pro_single.paise, // ₹49 — 1 match report
+  pro_pack: PRO_PLANS.pro_pack.paise, // ₹149 — 5 match reports
+  pro_pass: PRO_PLANS.pro_pass.paise, // ₹299 — 7-day unlimited pass
 };
 const PLANS = Object.keys(PRICE_PAISE) as (keyof typeof PRICE_PAISE & string)[];
 

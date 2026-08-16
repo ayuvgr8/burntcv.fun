@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { ensurePassForOrder } from "@/lib/entitlements";
+import { ensureProForOrder, isProPlan } from "@/lib/pro/entitlements";
 
 export const runtime = "nodejs";
 
@@ -50,12 +51,23 @@ export async function POST(req: Request) {
     const order = event.payload?.order?.entity;
     const orderId = pay?.order_id || order?.id;
     const amount = pay?.amount ?? order?.amount;
-    const isPass = amount === PASS_PAISE || order?.notes?.plan === "lifetime";
+    const email = pay?.email && pay.email !== "void@razorpay.com" ? pay.email : "";
 
-    if (orderId && isPass) {
-      const email = pay?.email && pay.email !== "void@razorpay.com" ? pay.email : "";
+    // Which plan was bought? The order's server-set notes are authoritative.
+    // payment.captured events don't carry order notes, so fetch the order
+    // when needed — amount alone can't distinguish ₹49 pro_single from the
+    // ₹49 glowup.
+    let plan = order?.notes?.plan ?? "";
+    if (orderId && !plan && amount !== PASS_PAISE) {
+      plan = (await fetchOrderPlan(orderId)) ?? "";
+    }
+
+    if (orderId && (plan === "lifetime" || amount === PASS_PAISE)) {
       await ensurePassForOrder({ orderId, email, region: "IN" });
       console.log("[webhook] pass granted for order", orderId);
+    } else if (orderId && isProPlan(plan)) {
+      await ensureProForOrder({ orderId, plan, email });
+      console.log(`[webhook] ${plan} granted for order`, orderId);
     }
   } catch (err) {
     console.error("[webhook] processing error:", err);
@@ -63,4 +75,24 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+// Look up an order's server-set notes.plan (payment.captured payloads omit it).
+async function fetchOrderPlan(orderId: string): Promise<string | null> {
+  const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) return null;
+  try {
+    const res = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
+      headers: {
+        authorization:
+          "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64"),
+      },
+    });
+    if (!res.ok) return null;
+    const o = (await res.json()) as { notes?: { plan?: string } };
+    return o.notes?.plan ?? null;
+  } catch {
+    return null;
+  }
 }
